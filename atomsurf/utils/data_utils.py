@@ -1,5 +1,6 @@
 import os
 import re
+import numpy as np
 
 from omegaconf import open_dict
 import torch
@@ -126,6 +127,67 @@ def pdb_to_surf(pdb_path, surface_dump, face_reduction_rate=0.1, max_vert_number
     except Exception as e:
         print('pdb_to_surf failed for : ', pdb_path, e)
         success = 0
+    return success
+
+
+def pdb_to_graphs_test(pdb_path, agraph_dump=None, rgraph_dump=None, recompute_g=False):
+    """
+    Wrapper code to go from a PDB to an AtomGraph and a ResidueGraph.
+    Includes debugging checks and automatic type conversion.
+    """
+    try:
+        do_rgraphs = rgraph_dump is not None and (recompute_g or not os.path.exists(rgraph_dump))
+        do_agraphs = agraph_dump is not None and (recompute_g or not os.path.exists(agraph_dump))
+        
+        if do_rgraphs or do_agraphs:
+            try:
+                arrays = parse_pdb_path(pdb_path, use_pqr=False)
+                print(f"✅ Parsed PDB arrays: {arrays}")  # Debug
+                print(f"🔍 Type of arrays: {type(arrays)}")
+            except Exception as e:
+                print(f"Trying to use PQR to fix SSE, initial error: {e}")
+                arrays = parse_pdb_path(pdb_path)
+            print(f"🔍 Type of arrays: {type(arrays)}")
+            
+            # **Debugging: Print content types of arrays**
+            print("Checking array types before processing:")
+            for key, value in arrays.items():
+                if isinstance(value, np.ndarray):
+                    print(f"  {key}: dtype={value.dtype}, shape={value.shape}")
+                    if value.dtype.kind in {'U', 'S'}:  # Unicode or String dtype
+                        print(f"  ⚠️ Fixing dtype for {key}")
+                        arrays[key] = value.astype(np.float32)  # Convert strings to floats
+            
+            # **Create ResidueGraph**
+            if do_rgraphs:
+                try:
+                    rgraph = ResidueGraphBuilder(add_pronet=True, add_esm=False).arrays_to_resgraph(arrays)
+                    makedirs_path(rgraph_dump)
+                    torch.save(rgraph, open(rgraph_dump, 'wb'))
+                except Exception as e:
+                    print(f"⚠️ ResidueGraphBuilder failed for {pdb_path}: {e}")
+                    for key, value in arrays.items():
+                        print(f"  {key}: type={type(value)}, dtype={value.dtype if isinstance(value, np.ndarray) else 'N/A'}")
+                    raise
+
+            # **Create AtomGraph**
+            if do_agraphs:
+                try:
+                    agraph = AtomGraphBuilder().arrays_to_agraph(arrays)
+                    makedirs_path(agraph_dump)
+                    torch.save(agraph, open(agraph_dump, 'wb'))
+                except Exception as e:
+                    print(f"⚠️ AtomGraphBuilder failed for {pdb_path}: {e}")
+                    for key, value in arrays.items():
+                        print(f"  {key}: type={type(value)}, dtype={value.dtype if isinstance(value, np.ndarray) else 'N/A'}")
+                    raise
+
+        success = 1
+
+    except Exception as e:
+        print(f"❌ pdb_to_graphs failed for {pdb_path}: {e}")
+        success = 0
+
     return success
 
 

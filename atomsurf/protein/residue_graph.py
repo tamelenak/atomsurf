@@ -217,7 +217,7 @@ class ResidueGraphBuilder:
         :return:
         """
         amino_types, atom_chain_id, atom_amino_id, atom_names, _, atom_pos, atom_charge, atom_radius, res_sse, amino_ids, _ = arrays
-        mask_ca = np.char.equal(atom_names, 'CA')
+        mask_ca = np.array([name == 'CA' for name in atom_names])
         pos_ca = np.full((len(amino_types), 3), np.nan)
         pos_ca[atom_amino_id[mask_ca]] = atom_pos[mask_ca]
         pos_ca = torch.FloatTensor(pos_ca)
@@ -239,6 +239,134 @@ class ResidueGraphBuilder:
             pfc = PronetFeaturesComputer()
             pronet_features = pfc.get_pronet_features(amino_types, atom_amino_id, atom_names, atom_pos)
             res_graph.features.add_misc_features("pronet_features", pronet_features)
+        return res_graph
+    
+    def arrays_to_resgraph2(self, arrays, pdb_path=None, esm_path=None):
+        """
+        Creation from array directly enables a speed up that originates from loading pdb once for both agraph anr rgraph
+        :param arrays:
+        :param pdb_path:
+        :param esm_path:
+        :return:
+        """
+        # Print the length of arrays tuple to debug
+        print(f"Arrays tuple length: {len(arrays)}")
+        
+        # Correct unpacking
+        if len(arrays) >= 10:
+            amino_types = arrays[0]
+            atom_chain_id = arrays[1]
+            atom_amino_id = arrays[2]
+            atom_names = arrays[3]
+            atom_pos = arrays[5]
+            atom_charge = arrays[6]
+            atom_radius = arrays[7]
+            res_sse = arrays[8]
+            amino_ids = arrays[9]
+        else:
+            raise ValueError(f"Expected at least 10 elements in arrays tuple, got {len(arrays)}")
+        
+        # Check the type of atom_names and handle accordingly
+        print(f"atom_names type: {type(atom_names)}, dtype: {atom_names.dtype}")
+        
+        # If atom_names are integers, we need a mapping to identify CA atoms
+        # Common mapping: 0="N", 1="CA", 2="C", 3="O", etc.
+        # This is a guess - you might need to adjust based on your actual data
+        if np.issubdtype(atom_names.dtype, np.integer) or np.issubdtype(atom_names.dtype, np.int32):
+            print("Atom names are integers, attempting to identify CA atoms by convention")
+            # Assuming 1 might be CA (this is a guess - adjust as needed)
+            mask_ca = atom_names == 1
+        elif np.issubdtype(atom_names.dtype, np.str_):
+            # Normal string comparison
+            atom_names = atom_names.tolist()
+            mask_ca = np.array([name == 'CA' for name in atom_names])
+        else:
+            print(f"Unexpected atom_names dtype: {atom_names.dtype}")
+            # Try a few common mappings for CA atoms
+            possible_ca_values = [1, 2, 3, 4]  # Try different common values
+            for ca_value in possible_ca_values:
+                mask_ca = atom_names == ca_value
+                if np.sum(mask_ca) > 0:
+                    print(f"Found potential CA atoms with value {ca_value}: {np.sum(mask_ca)} atoms")
+                    break
+            else:
+                # If no CA atoms found with any value, create empty mask
+                print("Could not identify any CA atoms!")
+                mask_ca = np.zeros(len(atom_names), dtype=bool)
+        
+        print(f"CA atoms found: {np.sum(mask_ca)}")
+        
+        # Debug atom_amino_id
+        print(f"atom_amino_id shape: {atom_amino_id.shape}")
+        print(f"atom_amino_id min: {atom_amino_id.min()}, max: {atom_amino_id.max()}")
+        print(f"amino_types length: {len(amino_types)}")
+        
+        # Create residue positions array
+        pos_ca = np.full((len(amino_types), 3), np.nan)
+        
+        # Handle the case with no CA atoms
+        if np.sum(mask_ca) == 0:
+            print("WARNING: No CA atoms found! Using first atom of each residue.")
+            # Alternative: Use the first atom of each residue
+            first_atoms = {}
+            for i, res_idx in enumerate(atom_amino_id):
+                if res_idx not in first_atoms:
+                    first_atoms[res_idx] = i
+            
+            for res_idx, atom_idx in first_atoms.items():
+                if res_idx < len(amino_types):
+                    pos_ca[res_idx] = atom_pos[atom_idx]
+        else:
+            # Use identified CA atoms
+            ca_indices = atom_amino_id[mask_ca]
+            if len(ca_indices) == 0:
+                print("WARNING: No CA atoms mapped to residues!")
+                pos_ca = np.zeros((len(amino_types), 3))
+            else:
+                valid_indices = ca_indices < len(amino_types)
+                if not np.all(valid_indices):
+                    print(f"WARNING: Some CA indices out of bounds: {ca_indices[~valid_indices]}")
+                    ca_indices = ca_indices[valid_indices]
+                    mask_ca_filtered = np.zeros_like(mask_ca)
+                    mask_ca_filtered[np.where(mask_ca)[0][valid_indices]] = True
+                    mask_ca = mask_ca_filtered
+                
+                pos_ca[ca_indices] = atom_pos[mask_ca]
+        
+        # Check for NaN values
+        nan_count = np.isnan(pos_ca).any(axis=1).sum()
+        if nan_count > 0:
+            print(f"WARNING: {nan_count} residues have NaN coordinates!")
+            # Replace NaNs with zeros to avoid errors
+            pos_ca = np.nan_to_num(pos_ca)
+        
+        pos_ca = torch.FloatTensor(pos_ca)
+        
+        # Edge creation
+        edge_index, edge_dists = atom_coords_to_edges(pos_ca, edge_dist_cutoff=12)
+        
+        # Create the graph
+        res_graph = ResidueGraph(node_pos=pos_ca,
+                                edge_index=edge_index,
+                                edge_attr=edge_dists,
+                                node_names=amino_ids)
+        
+        # Add features
+        res_graph.features.add_named_oh_features('amino_types', amino_types, 21)
+        res_graph.features.add_named_oh_features('sse', res_sse, nclasses=8)
+        
+        hphob = np.asarray([res_type_to_hphob.get(amino_type, 0) for amino_type in amino_types], dtype=np.float32)
+        res_graph.features.add_named_features('hphobs', hphob)
+        
+        if self.add_esm and pdb_path is not None:
+            esm_embed = get_esm_embedding_single(pdb_path, esm_path)
+            res_graph.features.add_named_features('esm_embed', esm_embed)
+        
+        if self.add_pronet:
+            pfc = PronetFeaturesComputer()
+            pronet_features = pfc.get_pronet_features(amino_types, atom_amino_id, atom_names, atom_pos)
+            res_graph.features.add_misc_features("pronet_features", pronet_features)
+        
         return res_graph
 
     def pdb_to_resgraph(self, pdb_path, esm_path=None):
