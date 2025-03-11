@@ -4,7 +4,7 @@ from torch_geometric.data import Data
 from atomsurf.protein.create_esm import get_esm_embedding_single, get_esm_embedding_batch
 from atomsurf.utils.data_utils import AtomBatch, PreprocessDataset, pdb_to_surf, pdb_to_graphs
 from atomsurf.utils.python_utils import do_all
-#from atomsurf.utils.wrappers import DefaultLoader, get_default_model
+from atomsurf.utils.wrappers import DefaultLoader, get_default_model
 
 # Set up data paths
 pdb_dir = "example_data/pdb"
