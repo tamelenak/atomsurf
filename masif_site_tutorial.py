@@ -20,7 +20,11 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from omegaconf import DictConfig
 import torch.nn as nn
+import io
+import warnings
 
+# Import the Features class
+from atomsurf.protein.features import Features
 from atomsurf.protein.create_esm import get_esm_embedding_single, get_esm_embedding_batch
 from atomsurf.utils.data_utils import AtomBatch, PreprocessDataset, SurfaceLoader, GraphLoader
 from atomsurf.utils.python_utils import do_all
@@ -29,6 +33,44 @@ from atomsurf.tasks.masif_site.preprocess import PreProcessMSDataset
 from atomsurf.tasks.masif_site.model import MasifSiteNet
 from atomsurf.tasks.masif_site.data_loader import MasifSiteDataset
 
+# Monkey patch the Features class to silence the specific warnings
+original_build_expanded_features = Features.build_expanded_features
+
+def silent_build_expanded_features(self, feature_keys='all', oh_keys='all', feature_expander=None):
+    # Temporarily redirect stdout
+    original_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    
+    # Call the original method
+    result = original_build_expanded_features(self, feature_keys, oh_keys, feature_expander)
+    
+    # Restore stdout
+    sys.stdout = original_stdout
+    
+    return result
+
+# Apply the patch
+Features.build_expanded_features = silent_build_expanded_features
+
+# Disable print output for warnings
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
+# Redirect stdout context manager - no longer needed with our patch
+class SuppressOutput:
+    def __init__(self):
+        self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
+        self.save_fds = [os.dup(1), os.dup(2)]
+        
+    def __enter__(self):
+        os.dup2(self.null_fds[0], 1)
+        os.dup2(self.null_fds[1], 2)
+        return self
+        
+    def __exit__(self, *_):
+        os.dup2(self.save_fds[0], 1)
+        os.dup2(self.save_fds[1], 2)
+        for fd in self.null_fds + self.save_fds:
+            os.close(fd)
 
 def setup_directories():
     """Set up necessary directories for data processing and results."""
@@ -103,37 +145,54 @@ def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir):
     train_systems_list = os.path.join(data_dir, 'splits', 'train_list.txt')
     train_systems = [name.strip() for name in open(train_systems_list, 'r').readlines()]
     
+    # Filter train systems to keep only the ones where files exist
+    print("Filtering systems to remove missing files...")
+    valid_train_systems = []
+    for system in train_systems:
+        graph_path = os.path.join(rgraph_dir, f"{system}.pt")
+        surface_path = os.path.join(surface_dir, f"{system}.pt")
+        if os.path.exists(graph_path) and os.path.exists(surface_path):
+            valid_train_systems.append(system)
+    
+    print(f"Found {len(valid_train_systems)} valid training systems out of {len(train_systems)}")
+    
     # Load the test systems list
     test_systems_list = os.path.join(data_dir, 'splits', 'test_list.txt')
     test_systems = [name.strip() for name in open(test_systems_list, 'r').readlines()]
     
-    # Create datasets
+    # Filter test systems to keep only the ones where files exist
+    valid_test_systems = []
+    for system in test_systems:
+        graph_path = os.path.join(rgraph_dir, f"{system}.pt")
+        surface_path = os.path.join(surface_dir, f"{system}.pt")
+        if os.path.exists(graph_path) and os.path.exists(surface_path):
+            valid_test_systems.append(system)
+    
+    print(f"Found {len(valid_test_systems)} valid test systems out of {len(test_systems)}")
+    
+    if not valid_train_systems:
+        raise ValueError("No valid training systems found with existing files!")
+    
+    # Create datasets with filtered systems
     train_dataset = MasifSiteDataset(
-        systems=train_systems,
+        systems=valid_train_systems,
         surface_builder=surface_builder,
         graph_builder=graph_builder
     )
     
-    # Debug: Check if we can load any data
-    print(f"Number of training systems: {len(train_systems)}")
-    for i in range(min(5, len(train_systems))):
-        system = train_systems[i]
-        print(f"Trying to load system {system}...")
+    # Find a valid example quietly
+    for i in range(min(5, len(valid_train_systems))):
+        system = valid_train_systems[i]
         surface = surface_builder.load(system)
         graph = graph_builder.load(system)
-        print(f"  Surface is None: {surface is None}")
-        print(f"  Graph is None: {graph is None}")
         if surface is not None and graph is not None:
-            print(f"  Found valid data for system {system}")
-            # Use this system for model setup
             train_dataset.valid_idx = i
             break
     else:
-        print("ERROR: Could not find any valid data in the first 5 systems!")
         raise ValueError("No valid data found in the dataset")
     
     test_dataset = MasifSiteDataset(
-        systems=test_systems,
+        systems=valid_test_systems,
         surface_builder=surface_builder,
         graph_builder=graph_builder
     )
@@ -171,7 +230,7 @@ def setup_model(train_dataset):
     
     # Create configuration for head
     cfg_head = DictConfig({
-        "encoded_dims": 32,
+        "encoded_dims": 52,  # Changed from 32 to 52 to match the actual feature dimensions
         "output_dims": 1
     })
 
@@ -198,29 +257,44 @@ def train_model(model, train_loader, optimizer, criterion, device, num_epochs=10
         model.train()
         total_loss = 0
         batch_count = 0
+        processed_items = 0
+        error_count = 0
         
-        for batch in train_loader:
+        for batch_idx, batch in enumerate(train_loader):
             try:
                 batch = batch.to(device)
                 optimizer.zero_grad()
                 
                 # Forward pass
                 pred = model(batch)
+                # Flatten the predictions to match the target shape
+                pred = pred.x.flatten()
                 loss = criterion(pred, batch.surface.iface_labels.float())
                 
                 # Backward pass
                 loss.backward()
                 optimizer.step()
                 
+                batch_size = len(pred) if hasattr(pred, '__len__') else 1
+                processed_items += batch_size
                 total_loss += loss.item()
                 batch_count += 1
+                
+                # Print progress every 10 batches
+                if batch_idx % 10 == 0:
+                    print(f'  Batch {batch_idx}/{len(train_loader)}, Current loss: {loss.item():.4f}')
+                    
             except Exception as e:
-                print(f"Error processing batch: {e}")
+                error_count += 1
+                print(f"Error processing batch {batch_idx}: {e}")
+                if error_count > 10:
+                    print("Too many errors, stopping training")
+                    break
                 continue
         
         if batch_count > 0:
             avg_loss = total_loss / batch_count
-            print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}')
+            print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}, Processed items: {processed_items}, Error batches: {error_count}')
         else:
             print(f'Epoch {epoch+1}/{num_epochs}, No valid batches processed')
     
@@ -258,12 +332,13 @@ def evaluate_model(model, test_dataset, device):
         # Find a valid test example
         for i in range(min(5, len(test_dataset))):
             test_data = test_dataset[i]
+            
             if test_data is not None:
                 print(f"Using test example {i} for evaluation")
                 test_data = test_data.to(device)
                 batch = AtomBatch.from_data_list([test_data])
                 pred = model(batch)
-                pred_labels = (torch.sigmoid(pred) > 0.5).float()
+                pred_labels = (torch.sigmoid(pred.x) > 0.5).float()
                 
                 # Visualize results
                 visualize_predictions(
@@ -285,12 +360,14 @@ def main():
     # Preprocessing
     #preprocess_data(data_dir, pdb_dir, esm_dir)
     
-    # Dataset setup
+    # Dataset setup - our monkey patch will suppress the specific warnings
+    print("Loading datasets...")
     train_dataset, test_dataset, train_loader = setup_datasets(
         data_dir, surface_dir, rgraph_dir, esm_dir
     )
     
     # Model setup
+    print("Setting up model...")
     model, device, optimizer, criterion = setup_model(train_dataset)
     
     # Training

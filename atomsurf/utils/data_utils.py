@@ -89,9 +89,9 @@ class GraphLoader:
             return Data()
         try:
             graph_path = os.path.join(self.data_dir, f"{graph_name}.pt")
-            print(f"\nLoading graph from {graph_path}")
+            #print(f"\nLoading graph from {graph_path}")
             graph = torch.load(graph_path)
-            print(f"Graph loaded successfully. Keys: {graph.keys}")
+            #print(f"Graph loaded successfully. Keys: {graph.keys}")
             
             # patch
             if "node_len" not in graph.keys:
@@ -101,7 +101,7 @@ class GraphLoader:
             feature_keys = self.config.feat_keys
             if self.use_esm:
                 esm_feats_path = os.path.join(self.esm_dir, f"{graph_name}_esm.pt")
-                print(f"Loading ESM features from {esm_feats_path}")
+                #print(f"Loading ESM features from {esm_feats_path}")
                 try:
                     esm_feats = torch.load(esm_feats_path)
                     graph.features.add_named_features('esm_feats', esm_feats)
@@ -111,7 +111,7 @@ class GraphLoader:
                     print(f"Failed to load ESM features: {e}")
                     return None
             
-            print("Expanding features...")
+            #print("Expanding features...")
             with torch.no_grad():
                 graph.expand_features(remove_feats=True,
                     feature_keys=feature_keys,
@@ -125,7 +125,7 @@ class GraphLoader:
                 print("Found NaN values in graph.node_pos")
                 return None
                 
-            print("Graph loaded and processed successfully")
+            #print("Graph loaded and processed successfully")
             return graph
             
         except Exception as e:
