@@ -23,4 +23,5 @@ python -c "import torch; print(torch.cuda.is_available())"
 Test if environment is correctly set up by running a minimal script
 ```bash
 python example.py
+apt-get update && apt-get install -y pdb2pqr
 ```
