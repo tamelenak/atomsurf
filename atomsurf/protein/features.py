@@ -119,7 +119,16 @@ class Features(Data):
             for feature_key in oh_keys:
                 type_feature = self.named_one_hot_features[feature_key]
                 n_classes = self.named_one_hot_features_nclasses[feature_key]
-                encoded_feat = torch.eye(n_classes)[type_feature.long()]
+                
+                # Clamp values to be within valid range for one-hot encoding
+                type_feature_clamped = torch.clamp(type_feature, 0, n_classes-1).long()
+                
+                # Check if any values were clamped and print a warning
+                if torch.any(type_feature != type_feature_clamped):
+                    print(f"WARNING: Feature '{feature_key}' had values outside the valid range [0, {n_classes-1}]. "
+                          f"Values have been clamped.")
+                
+                encoded_feat = torch.eye(n_classes)[type_feature_clamped]
                 if len(encoded_feat) != self.num_nodes:
                     encoded_feat = self.expand_one(encoded_feat)
                 all_features.append(encoded_feat)

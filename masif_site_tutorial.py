@@ -18,13 +18,15 @@ import numpy as np
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from omegaconf import DictConfig
+import torch.nn as nn
 
 from atomsurf.protein.create_esm import get_esm_embedding_single, get_esm_embedding_batch
-from atomsurf.utils.data_utils import AtomBatch, PreprocessDataset
+from atomsurf.utils.data_utils import AtomBatch, PreprocessDataset, SurfaceLoader, GraphLoader
 from atomsurf.utils.python_utils import do_all
 from atomsurf.utils.wrappers import DefaultLoader, get_default_model
 from atomsurf.tasks.masif_site.preprocess import PreProcessMSDataset
-from atomsurf.tasks.masif_site.model import MasifSiteModel
+from atomsurf.tasks.masif_site.model import MasifSiteNet
 from atomsurf.tasks.masif_site.data_loader import MasifSiteDataset
 
 
@@ -32,7 +34,8 @@ def setup_directories():
     """Set up necessary directories for data processing and results."""
     data_dir = "data/masif_site"
     benchmark_pdb_dir = os.path.join(data_dir, "01-benchmark_pdbs")
-    surface_dir = os.path.join(data_dir, "surfaces")
+    # Surface directory will include the face reduction rate in its name
+    surface_dir = os.path.join(data_dir, "surfaces_0.5_False")  # 0.5 is the face_reduction_rate, False for use_pymesh
     rgraph_dir = os.path.join(data_dir, "rgraph")
     esm_dir = os.path.join(data_dir, "esm_emb")
 
@@ -70,15 +73,71 @@ def preprocess_data(data_dir, pdb_dir, esm_dir):
 
 def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir):
     """Set up training and testing datasets."""
-    # Load the training dataset
+    # Create configuration objects for surface and graph loaders
+    
+    # Surface configuration
+    cfg_surface = DictConfig({})
+    cfg_surface.use_surfaces = True
+    cfg_surface.feat_keys = 'all'
+    cfg_surface.oh_keys = 'all'
+    cfg_surface.gdf_expand = True
+    cfg_surface.data_dir = data_dir  # The root data directory
+    cfg_surface.data_name = 'surfaces_0.5_False'  # The subdirectory containing the .pt files
+    
+    # Graph configuration
+    cfg_graph = DictConfig({})
+    cfg_graph.use_graphs = True
+    cfg_graph.feat_keys = 'all'
+    cfg_graph.oh_keys = 'all'
+    cfg_graph.esm_dir = esm_dir
+    # Re-enable ESM features now that we've fixed the one-hot encoding issue
+    cfg_graph.use_esm = True  # Changed back to True
+    cfg_graph.data_dir = data_dir  # The root data directory
+    cfg_graph.data_name = 'rgraph'  # The subdirectory containing the graph .pt files
+    
+    # Create surface and graph builders
+    surface_builder = SurfaceLoader(cfg_surface)
+    graph_builder = GraphLoader(cfg_graph)
+    
+    # Load the training systems list
+    train_systems_list = os.path.join(data_dir, 'splits', 'train_list.txt')
+    train_systems = [name.strip() for name in open(train_systems_list, 'r').readlines()]
+    
+    # Load the test systems list
+    test_systems_list = os.path.join(data_dir, 'splits', 'test_list.txt')
+    test_systems = [name.strip() for name in open(test_systems_list, 'r').readlines()]
+    
+    # Create datasets
     train_dataset = MasifSiteDataset(
-        data_dir=data_dir,
-        split='train',
-        surface_dir=surface_dir,
-        graph_dir=rgraph_dir,
-        embeddings_dir=esm_dir
+        systems=train_systems,
+        surface_builder=surface_builder,
+        graph_builder=graph_builder
     )
-
+    
+    # Debug: Check if we can load any data
+    print(f"Number of training systems: {len(train_systems)}")
+    for i in range(min(5, len(train_systems))):
+        system = train_systems[i]
+        print(f"Trying to load system {system}...")
+        surface = surface_builder.load(system)
+        graph = graph_builder.load(system)
+        print(f"  Surface is None: {surface is None}")
+        print(f"  Graph is None: {graph is None}")
+        if surface is not None and graph is not None:
+            print(f"  Found valid data for system {system}")
+            # Use this system for model setup
+            train_dataset.valid_idx = i
+            break
+    else:
+        print("ERROR: Could not find any valid data in the first 5 systems!")
+        raise ValueError("No valid data found in the dataset")
+    
+    test_dataset = MasifSiteDataset(
+        systems=test_systems,
+        surface_builder=surface_builder,
+        graph_builder=graph_builder
+    )
+    
     # Create training data loader
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -87,31 +146,39 @@ def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir):
         num_workers=4,
         collate_fn=AtomBatch.from_data_list
     )
-
-    # Load the test dataset
-    test_dataset = MasifSiteDataset(
-        data_dir=data_dir,
-        split='test',
-        surface_dir=surface_dir,
-        graph_dir=rgraph_dir,
-        embeddings_dir=esm_dir
-    )
-
-    return train_dataset, train_loader, test_dataset
+    
+    return train_dataset, test_dataset, train_loader
 
 
 def setup_model(train_dataset):
     """Initialize and set up the MaSIF site model."""
     # Get input dimensions from example data
-    example_data = train_dataset[0]
-    in_dim_surface = example_data.surface.x.shape[-1]
-    in_dim_graph = example_data.graph.x.shape[-1]
+    if hasattr(train_dataset, 'valid_idx'):
+        example_data = train_dataset[train_dataset.valid_idx]
+    else:
+        # Try to find a valid example
+        for i in range(len(train_dataset)):
+            example_data = train_dataset[i]
+            if example_data is not None:
+                break
+        else:
+            raise ValueError("No valid data found in the dataset")
+    
+    # Create proper configuration for encoder
+    cfg_encoder = DictConfig({
+        "blocks": []  # Empty blocks list - the model will handle this internally
+    })
+    
+    # Create configuration for head
+    cfg_head = DictConfig({
+        "encoded_dims": 32,
+        "output_dims": 1
+    })
 
-    # Initialize model
-    model = MasifSiteModel(
-        in_dim_surface=in_dim_surface,
-        in_dim_graph=in_dim_graph,
-        hidden_dim=32
+    # Initialize the original MasifSiteNet model
+    model = MasifSiteNet(
+        cfg_encoder=cfg_encoder,
+        cfg_head=cfg_head
     )
 
     # Set up device and optimizer
@@ -130,23 +197,32 @@ def train_model(model, train_loader, optimizer, criterion, device, num_epochs=10
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
+        batch_count = 0
         
         for batch in train_loader:
-            batch = batch.to(device)
-            optimizer.zero_grad()
-            
-            # Forward pass
-            pred = model(batch)
-            loss = criterion(pred, batch.surface.iface_labels.float())
-            
-            # Backward pass
-            loss.backward()
-            optimizer.step()
-            
-            total_loss += loss.item()
+            try:
+                batch = batch.to(device)
+                optimizer.zero_grad()
+                
+                # Forward pass
+                pred = model(batch)
+                loss = criterion(pred, batch.surface.iface_labels.float())
+                
+                # Backward pass
+                loss.backward()
+                optimizer.step()
+                
+                total_loss += loss.item()
+                batch_count += 1
+            except Exception as e:
+                print(f"Error processing batch: {e}")
+                continue
         
-        avg_loss = total_loss / len(train_loader)
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}')
+        if batch_count > 0:
+            avg_loss = total_loss / batch_count
+            print(f'Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}')
+        else:
+            print(f'Epoch {epoch+1}/{num_epochs}, No valid batches processed')
     
     print("Training complete!")
 
@@ -179,17 +255,26 @@ def evaluate_model(model, test_dataset, device):
     
     model.eval()
     with torch.no_grad():
-        test_data = test_dataset[0].to(device)
-        pred = model(AtomBatch.from_data_list([test_data]))
-        pred_labels = (torch.sigmoid(pred) > 0.5).float()
-
-    # Visualize results
-    visualize_predictions(
-        vertices=test_data.surface.pos.cpu(),
-        faces=test_data.surface.face.t().cpu(),
-        predictions=pred_labels,
-        true_labels=test_data.surface.iface_labels
-    )
+        # Find a valid test example
+        for i in range(min(5, len(test_dataset))):
+            test_data = test_dataset[i]
+            if test_data is not None:
+                print(f"Using test example {i} for evaluation")
+                test_data = test_data.to(device)
+                batch = AtomBatch.from_data_list([test_data])
+                pred = model(batch)
+                pred_labels = (torch.sigmoid(pred) > 0.5).float()
+                
+                # Visualize results
+                visualize_predictions(
+                    vertices=test_data.surface.pos.cpu(),
+                    faces=test_data.surface.face.t().cpu(),
+                    predictions=pred_labels,
+                    true_labels=test_data.surface.iface_labels
+                )
+                break
+        else:
+            print("Could not find a valid test example for evaluation")
 
 
 def main():
@@ -198,10 +283,10 @@ def main():
     data_dir, pdb_dir, surface_dir, rgraph_dir, esm_dir = setup_directories()
     
     # Preprocessing
-    preprocess_data(data_dir, pdb_dir, esm_dir)
+    #preprocess_data(data_dir, pdb_dir, esm_dir)
     
     # Dataset setup
-    train_dataset, train_loader, test_dataset = setup_datasets(
+    train_dataset, test_dataset, train_loader = setup_datasets(
         data_dir, surface_dir, rgraph_dir, esm_dir
     )
     

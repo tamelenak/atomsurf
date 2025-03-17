@@ -88,27 +88,51 @@ class GraphLoader:
         if not self.config.use_graphs:
             return Data()
         try:
-            graph = torch.load(os.path.join(self.data_dir, f"{graph_name}.pt"))
+            graph_path = os.path.join(self.data_dir, f"{graph_name}.pt")
+            print(f"\nLoading graph from {graph_path}")
+            graph = torch.load(graph_path)
+            print(f"Graph loaded successfully. Keys: {graph.keys}")
+            
             # patch
             if "node_len" not in graph.keys:
+                print("Adding missing node_len")
                 graph.node_len = len(graph.node_pos)
+            
             feature_keys = self.config.feat_keys
             if self.use_esm:
                 esm_feats_path = os.path.join(self.esm_dir, f"{graph_name}_esm.pt")
-                esm_feats = torch.load(esm_feats_path)
-                graph.features.add_named_features('esm_feats', esm_feats)
-                if feature_keys != 'all':
-                    feature_keys.append('esm_feats')
+                print(f"Loading ESM features from {esm_feats_path}")
+                try:
+                    esm_feats = torch.load(esm_feats_path)
+                    graph.features.add_named_features('esm_feats', esm_feats)
+                    if feature_keys != 'all':
+                        feature_keys.append('esm_feats')
+                except Exception as e:
+                    print(f"Failed to load ESM features: {e}")
+                    return None
+            
+            print("Expanding features...")
             with torch.no_grad():
                 graph.expand_features(remove_feats=True,
                     feature_keys=feature_keys,
                     oh_keys=self.config.oh_keys,
                     feature_expander=self.feature_expander)
-            if torch.isnan(graph.x).any() or torch.isnan(graph.node_pos).any():
+            
+            if torch.isnan(graph.x).any():
+                print("Found NaN values in graph.x")
                 return None
-        except Exception:
+            if torch.isnan(graph.node_pos).any():
+                print("Found NaN values in graph.node_pos")
+                return None
+                
+            print("Graph loaded and processed successfully")
+            return graph
+            
+        except Exception as e:
+            print(f"Failed to load graph: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
-        return graph
 
 
 def pdb_to_surf(pdb_path, surface_dump, face_reduction_rate=0.1, max_vert_number=100000, use_pymesh=None,
