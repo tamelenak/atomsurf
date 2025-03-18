@@ -43,12 +43,13 @@ def parse_args():
                         help='Skip evaluation step after training')
     return parser.parse_args()
 
+
 def setup_directories():
     """Set up necessary directories for data processing and results."""
     data_dir = "data/masif_site"
-    benchmark_pdb_dir = os.path.join(data_dir, "01-benchmark_pdbs")
+    pdb_dir = os.path.join(data_dir, "01-benchmark_pdbs")
     # Surface directory will include the face reduction rate in its name
-    surface_dir = os.path.join(data_dir, "surfaces_0.5_False2")  # 0.5 is the face_reduction_rate, False for use_pymesh
+    surface_dir = os.path.join(data_dir, "surfaces_0.5_False")  # 0.5 is the face_reduction_rate, False for use_pymesh
     rgraph_dir = os.path.join(data_dir, "rgraph")
     esm_dir = os.path.join(data_dir, "esm_emb")
 
@@ -57,7 +58,7 @@ def setup_directories():
     os.makedirs(rgraph_dir, exist_ok=True)
     os.makedirs(esm_dir, exist_ok=True)
 
-    return data_dir, benchmark_pdb_dir, surface_dir, rgraph_dir, esm_dir
+    return data_dir, pdb_dir, surface_dir, rgraph_dir, esm_dir
 
 
 def preprocess_data(data_dir, pdb_dir, esm_dir):
@@ -67,15 +68,19 @@ def preprocess_data(data_dir, pdb_dir, esm_dir):
     # Initialize the preprocessing dataset
     dataset = PreProcessMSDataset(
         data_dir=data_dir,
-        recompute_s=True,  # Set to True to recompute surfaces
-        recompute_g=True,  # Set to True to recompute graphs
+        recompute_s=False,  # Set to True to recompute surfaces
+        recompute_g=False,  # Set to True to recompute graphs
         face_reduction_rate=0.5,  # Adjust this value to control mesh resolution
-        use_pymesh=False
+        use_pymesh=False  # Add this parameter
     )
 
     # Run preprocessing
     print("Processing surfaces and graphs...")
     do_all(dataset, num_workers=8)  # Adjust number of workers based on your system
+
+    # Create train/test splits using only successfully processed proteins
+    print("Creating train/test splits with successfully processed proteins...")
+    dataset.create_final_data_splits()
 
     # Generate ESM embeddings
     print("Generating ESM embeddings...")
@@ -109,40 +114,24 @@ def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir, batch_size=4):
     surface_builder = SurfaceLoader(cfg_surface)
     graph_builder = GraphLoader(cfg_graph)
     
-    # Helper function to filter systems with existing files
-    def filter_valid_systems(systems):
-        valid = []
-        for system in systems:
-            if (os.path.exists(os.path.join(rgraph_dir, f"{system}.pt")) and 
-                os.path.exists(os.path.join(surface_dir, f"{system}.pt"))):
-                valid.append(system)
-        return valid
-    
     # Load and filter train systems
     train_systems_list = os.path.join(data_dir, 'splits', 'train_list.txt')
     train_systems = [name.strip() for name in open(train_systems_list, 'r').readlines()]
-    valid_train_systems = filter_valid_systems(train_systems)
-    print(f"Found {len(valid_train_systems)} valid training systems out of {len(train_systems)}")
     
     # Load and filter test systems
     test_systems_list = os.path.join(data_dir, 'splits', 'test_list.txt')
     test_systems = [name.strip() for name in open(test_systems_list, 'r').readlines()]
-    valid_test_systems = filter_valid_systems(test_systems)
-    print(f"Found {len(valid_test_systems)} valid test systems out of {len(test_systems)}")
-    
-    if not valid_train_systems:
-        raise ValueError("No valid training systems found with existing files!")
     
     # Create datasets
     train_dataset = MasifSiteDataset(
-        systems=valid_train_systems,
+        systems=train_systems,
         surface_builder=surface_builder,
         graph_builder=graph_builder
     )
     
     # Find a valid example
-    for i in range(min(5, len(valid_train_systems))):
-        system = valid_train_systems[i]
+    for i in range(min(5, len(train_systems))):
+        system = train_systems[i]
         if surface_builder.load(system) and graph_builder.load(system):
             train_dataset.valid_idx = i
             break
@@ -150,7 +139,7 @@ def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir, batch_size=4):
         raise ValueError("No valid data found in the dataset")
     
     test_dataset = MasifSiteDataset(
-        systems=valid_test_systems,
+        systems=test_systems,
         surface_builder=surface_builder,
         graph_builder=graph_builder
     )
@@ -160,7 +149,7 @@ def setup_datasets(data_dir, surface_dir, rgraph_dir, esm_dir, batch_size=4):
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=8,
         collate_fn=AtomBatch.from_data_list
     )
     
@@ -329,9 +318,6 @@ def main():
     """Main function to run the tutorial."""
     # Parse command-line arguments
     args = parse_args()
-    print(f"Using batch size: {args.batch_size}, epochs: {args.epochs}")
-    if args.skip_eval:
-        print("Evaluation will be skipped")
     
     # Setup directories
     data_dir, pdb_dir, surface_dir, rgraph_dir, esm_dir = setup_directories()

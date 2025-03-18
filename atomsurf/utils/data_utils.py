@@ -253,8 +253,8 @@ class PreprocessDataset(Dataset):
     """
 
     def __init__(self, data_dir, recompute_s=False, recompute_g=False, do_agraph=False,
-                 max_vert_number=100000, face_reduction_rate=0.1, use_pymesh=None):
-        self.pdb_dir = os.path.join(data_dir, 'pdb')
+                 max_vert_number=100000, face_reduction_rate=0.1, use_pymesh=None, pdb_dirname='01-benchmark_pdbs'):
+        self.pdb_dir = os.path.join(data_dir, pdb_dirname)
 
         # Surf params
         self.max_vert_number = max_vert_number
