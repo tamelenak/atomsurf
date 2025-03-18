@@ -119,10 +119,10 @@ class GraphLoader:
                     feature_expander=self.feature_expander)
             
             if torch.isnan(graph.x).any():
-                print("Found NaN values in graph.x")
+                #print("Found NaN values in graph.x")
                 return None
             if torch.isnan(graph.node_pos).any():
-                print("Found NaN values in graph.node_pos")
+                #print("Found NaN values in graph.node_pos")
                 return None
                 
             #print("Graph loaded and processed successfully")

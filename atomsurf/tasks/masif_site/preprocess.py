@@ -29,43 +29,19 @@ class PreProcessMSDataset(PreprocessDataset):
             script_dir = os.path.dirname(os.path.realpath(__file__))
             data_dir = os.path.join(script_dir, '..', '..', '..', 'data', 'masif_site')
 
-        # First set up the PDB directory path
-        self.pdb_dir = os.path.join(data_dir, 'pdb')
-        self.ply_dir = os.path.join(data_dir, '01-benchmark_surfaces')
-
-        # Get list of all PDB files
-        self.all_pdbs = sorted([os.path.splitext(f)[0] for f in os.listdir(self.pdb_dir) if f.endswith('.pdb')])
-
-        # Create splits directory if it doesn't exist
-        splits_dir = os.path.join(data_dir, 'splits')
-        os.makedirs(splits_dir, exist_ok=True)
-
-        # Generate train/test split (80/20)
-        import random
-        random.seed(42)  # For reproducibility
-        n_total = len(self.all_pdbs)
-        n_test = int(0.2 * n_total)
-        test_pdbs = sorted(random.sample(self.all_pdbs, n_test))
-        train_pdbs = sorted(list(set(self.all_pdbs) - set(test_pdbs)))
-
-        # Save train/test lists
-        train_list = os.path.join(splits_dir, 'train_list.txt')
-        test_list = os.path.join(splits_dir, 'test_list.txt')
-        
-        if not os.path.exists(train_list) or not os.path.exists(test_list):
-            with open(train_list, 'w') as f:
-                f.write('\n'.join(train_pdbs))
-            with open(test_list, 'w') as f:
-                f.write('\n'.join(test_pdbs))
-
-        # Now call super().__init__ after we have set up our custom paths
         super().__init__(data_dir=data_dir, recompute_s=recompute_s, recompute_g=recompute_g,
                          max_vert_number=max_vert_number, face_reduction_rate=face_reduction_rate,
                          use_pymesh=use_pymesh)
+        # Set up input/output dirs
+        self.pdb_dir = os.path.join(data_dir, '01-benchmark_pdbs')
+        self.ply_dir = os.path.join(data_dir, '01-benchmark_surfaces')
 
-    def get_all_pdbs(self):
-        """Override parent class method to use our pre-loaded list"""
-        return self.all_pdbs
+        # Set up systems list
+        train_list = os.path.join(data_dir, 'train_list.txt')
+        test_list = os.path.join(data_dir, 'test_list.txt')
+        train_names = set([name.strip() for name in open(train_list, 'r').readlines()])
+        test_names = set([name.strip() for name in open(test_list, 'r').readlines()])
+        self.all_pdbs = sorted(list(train_names.union(test_names)))
 
     def __getitem__(self, idx):
         pdb_name = self.all_pdbs[idx]

@@ -126,7 +126,7 @@ def get_esm_embedding_batch(in_pdbs_dir, dump_dir, num_workers=4, batch_size=8, 
 
 
 if __name__ == "__main__":
-    in_pdbs_dir = "../../data/masif_site/01-benchmark_pdbs"
+    in_pdbs_dir = "../../data/masif_site/pdb"
     dump_dir = "../../data/masif_site/01-benchmark_esm_embs"
     # in_pdbs = [os.path.join(in_pdbs_dir, pdb) for pdb in os.listdir(in_pdbs_dir) if pdb.endswith('.pdb')]
     # get_esm_embedding_batch_old(all_pdb_path=in_pdbs, dump_dir=out_embs)
