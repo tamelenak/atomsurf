@@ -18,14 +18,9 @@ pip install fair-esm biopython omegaconf deltaconv potpourri3d hydra open3d
 conda install cudatoolkit=11.7 -c nvidia
 conda install pytorch=1.13 pytorch-cuda=11.7 -c pytorch -c nvidia
 conda install pyg=2.3.0 pytorch-scatter pytorch-sparse pytorch-spline-conv pytorch-cluster -c pyg
-pip install pyg-lib==0.4.0 -f https://data.pyg.org/whl/torch-1.13.0+cu117.html
+pip install pyg-lib==0.3.1 -f https://data.pyg.org/whl/torch-1.13.0+cu117.html
 pip install pytorch-lightning==1.8.6
 python -c "import torch; print(torch.cuda.is_available())"
-```
-Test if environment is correctly set up by running a minimal script
-```bash
-python example.py
-apt-get update && apt-get install -y pdb2pqr
 ```
 Test if environment is correctly set up by running a minimal script
 ```bash

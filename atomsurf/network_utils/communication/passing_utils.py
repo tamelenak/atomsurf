@@ -71,7 +71,7 @@ class BPGraphBatch:
         return torch.cat((surf_x, graph_x))
 
 
-def compute_bipartite_graphs(surfaces, graphs, neigh_th=8, k=16, use_knn=False, num_gdf=16):
+def compute_bipartite_graphs(surfaces, graphs, neigh_th=8, k=4, use_knn=False, num_gdf=16):
     """
     Code to compute the graph tying surface vertices to graph nodes
     :param surfaces: A batched Surface object

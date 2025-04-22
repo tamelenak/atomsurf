@@ -6,35 +6,37 @@ defaults:
   - encoder: vanilla
   - optimizer: adam
   - scheduler: polynomial_lr
-  - override hydra/job_logging: colorlog
-  - override hydra/hydra_logging: colorlog
+  - override hydra/job_logging: default
+  - override hydra/hydra_logging: default
+  - override hydra/launcher: basic
   - _self_
 
 hydra:
   job:
     chdir: False
   searchpath:
-    - main/../../shared_conf/
+    - /home/tamara/atomsurf/atomsurf/tasks/shared_conf
 
 # general params
 seed: 2024
 run_name: default
-data_dir: ../../../data/masif_site/
-out_dir: ../../../outputs/masif_site/out_dir # does not work for me with chdir=False
+data_dir: /home/tamara/data/masif_site
+out_dir: /home/tamara/data/masif_site  # does not work for me with chdir=False
 log_dir: "./"
 test_freq: 5
 epochs: 200
-device: 0
+devices: [8, 9]
+strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"
 min_batch_size: 2
 use_wandb: False
 
 # loader params
 loader:
-  num_workers: 2
-  batch_size: 16
-  pin_memory: False
-  prefetch_factor: 2
+  num_workers: 8
+  batch_size: 64
+  pin_memory: True
+  prefetch_factor: 4
   shuffle: true
 
 train:

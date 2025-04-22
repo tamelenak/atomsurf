@@ -44,13 +44,13 @@ class MasifSiteDataModule(pl.LightningDataModule):
         # script_dir = os.path.dirname(os.path.realpath(__file__))
         # masif_site_data_dir = os.path.join(script_dir, '..', '..', '..', 'data', 'masif_site')
         masif_site_data_dir= cfg.data_dir
-        train_systems_list = os.path.join(masif_site_data_dir, 'train_list.txt')
+        train_systems_list = os.path.join(masif_site_data_dir, 'splits/train_list.txt')
         trainval_sys = [name.strip() for name in open(train_systems_list, 'r').readlines()]
         np.random.shuffle(trainval_sys)
         trainval_cut = int(0.9 * len(trainval_sys))
         self.train_sys = trainval_sys[:trainval_cut]
         self.val_sys = trainval_sys[trainval_cut:]
-        test_systems_list = os.path.join(masif_site_data_dir, 'test_list.txt')
+        test_systems_list = os.path.join(masif_site_data_dir, 'splits/test_list.txt')
         self.test_sys = [name.strip() for name in open(test_systems_list, 'r').readlines()]
 
         self.cfg = cfg

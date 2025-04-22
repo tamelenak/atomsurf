@@ -14,7 +14,7 @@ from atomsurf.utils.data_utils import PreprocessDataset
 from atomsurf.utils.python_utils import do_all
 
 torch.multiprocessing.set_sharing_strategy('file_system')
-torch.set_num_threads(1)
+torch.set_num_threads(4)
 
 
 class PreProcessMSDataset(PreprocessDataset):
@@ -26,8 +26,8 @@ class PreProcessMSDataset(PreprocessDataset):
                  max_vert_number=100000,
                  use_pymesh=True):
         if data_dir is None:
-            script_dir = os.path.dirname(os.path.realpath(__file__))
-            data_dir = os.path.join(script_dir, '..', '..', '..', 'data', 'masif_site')
+            # Use an absolute path to the data directory
+            data_dir = '/home/tamara/data/masif_site'
 
         # Set paths
         self.pdb_dir = os.path.join(data_dir, '01-benchmark_pdbs')
@@ -156,8 +156,10 @@ if __name__ == '__main__':
     recompute_g = False
     recompute_s = True
     
-    for use_pymesh in (False, True):
-        for face_red in [0.1, 0.2, 0.5, 0.9, 1.0]:
+    #for use_pymesh in (False, True):
+    for use_pymesh in [False]:
+        #for face_red in [0.1, 0.2, 0.5, 0.9, 1.0]:
+        for face_red in [0.1]:
             print(f"Processing with use_pymesh={use_pymesh}, face_reduction_rate={face_red}")
             dataset = PreProcessMSDataset(
                 recompute_s=recompute_s, 
@@ -165,7 +167,7 @@ if __name__ == '__main__':
                 face_reduction_rate=face_red, 
                 use_pymesh=use_pymesh
             )
-            do_all(dataset, num_workers=20)
+            do_all(dataset, num_workers=32)
             
             # Create train/test splits with only successfully processed proteins
             dataset.create_final_data_splits()

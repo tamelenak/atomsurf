@@ -26,8 +26,8 @@ class PreProcessMSDataset(PreprocessDataset):
                  max_vert_number=100000,
                  use_pymesh=True):
         if data_dir is None:
-            script_dir = os.path.dirname(os.path.realpath(__file__))
-            data_dir = os.path.join(script_dir, '..', '..', '..', 'data', 'masif_site')
+            # Use an absolute path to the data directory
+            data_dir = '/home/tamara/data/masif_site'
 
         super().__init__(data_dir=data_dir, recompute_s=recompute_s, recompute_g=recompute_g,
                          max_vert_number=max_vert_number, face_reduction_rate=face_reduction_rate,

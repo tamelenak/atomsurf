@@ -26,7 +26,7 @@ get_esm_embedding_single(pdb_path, esm_dir)
 
 
 # Do the same but automatically on a directory
-dataset = PreprocessDataset(data_dir="example_data")
+dataset = PreprocessDataset(data_dir="example_data", pdb_dirname="pdb")
 do_all(dataset, num_workers=2)
 get_esm_embedding_batch(in_pdbs_dir=pdb_dir, dump_dir=esm_dir)
 
