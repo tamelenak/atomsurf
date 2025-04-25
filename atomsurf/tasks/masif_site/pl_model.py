@@ -48,9 +48,16 @@ class MasifSiteModule(AtomPLModule):
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
-        # if torch.isnan(loss).any():
-        #     print('Nan loss')
-        #     return None, None, None
+        
+        # Log batch statistics
+        if self.training:
+            if hasattr(batch.graph, 'node_len'):
+                self.log_dict({
+                    "size/nodes": batch.graph.node_len.float().mean(),
+                    "size/points": len(labels),
+                    "size/loss": loss.item()
+                }, on_epoch=True, batch_size=len(labels))
+            
         return loss, outputs_concat, labels_concat
 
     def get_metrics(self, logits, labels, prefix):

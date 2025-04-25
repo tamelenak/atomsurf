@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import pytorch_lightning as pl
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, BatchSampler, RandomSampler
 from torch_geometric.data import Data
 
 if __name__ == '__main__':
@@ -34,6 +34,9 @@ class MasifSiteDataset(Dataset):
         return item
 
 
+def collate_fn(batch):
+    return AtomBatch.from_data_list(batch)
+
 class MasifSiteDataModule(pl.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
@@ -58,14 +61,24 @@ class MasifSiteDataModule(pl.LightningDataModule):
                             'batch_size': self.cfg.loader.batch_size,
                             'pin_memory': self.cfg.loader.pin_memory,
                             'prefetch_factor': self.cfg.loader.prefetch_factor,
-                            'collate_fn': lambda x: AtomBatch.from_data_list(x)}
+                            'collate_fn': collate_fn}
 
         dataset_temp = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader)
         update_model_input_dim(cfg, dataset_temp=dataset_temp)
 
     def train_dataloader(self):
         dataset = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader)
-        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args)
+        # Use BatchSampler with RandomSampler for more controlled batching
+        random_sampler = RandomSampler(dataset)
+        batch_sampler = BatchSampler(random_sampler, 
+                                   batch_size=self.cfg.loader.batch_size,
+                                   drop_last=True)
+        return DataLoader(dataset, 
+                        batch_sampler=batch_sampler,
+                        num_workers=self.cfg.loader.num_workers,
+                        pin_memory=self.cfg.loader.pin_memory,
+                        prefetch_factor=self.cfg.loader.prefetch_factor,
+                        collate_fn=collate_fn)
 
     def val_dataloader(self):
         dataset = MasifSiteDataset(self.val_sys, self.surface_loader, self.graph_loader)

@@ -61,14 +61,17 @@ def main(cfg=None):
                                                      mode='max')
     callbacks = [lr_logger, checkpoint_callback, early_stop_callback, CommandLoggerCallback(command)]
 
-    if torch.cuda.is_available():
-        params = {
-            "accelerator": "gpu",
-            "devices": cfg.devices,
-            "strategy": cfg.strategy
-        }
-    else:
-        params = {}
+    # Use the accelerator from config, defaulting to CPU if not specified
+    params = {
+        "accelerator": cfg.accelerator if hasattr(cfg, 'accelerator') else ("gpu" if torch.cuda.is_available() else "cpu")
+    }
+    
+    # Only add devices and strategy if using GPU
+    if params["accelerator"] == "gpu":
+        if hasattr(cfg, 'devices'):
+            params["devices"] = cfg.devices
+        if hasattr(cfg, 'strategy'):
+            params["strategy"] = cfg.strategy
 
     # init trainer
     trainer = pl.Trainer(
