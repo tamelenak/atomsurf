@@ -27,7 +27,7 @@ class PreProcessMSDataset(PreprocessDataset):
                  use_pymesh=True):
         if data_dir is None:
             # Use an absolute path to the data directory
-            data_dir = '/home/tamara/data/masif_site'
+            data_dir = '/root/atomsurf/masif_site_data'
 
         # Set paths
         self.pdb_dir = os.path.join(data_dir, '01-benchmark_pdbs')

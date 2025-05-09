@@ -5,7 +5,9 @@ from pathlib import Path
 import shutil
 import sys
 
-sys.path.append(os.path.abspath('atomsurf'))
+script_dir = os.path.dirname(os.path.realpath(__file__))
+project_root = os.path.abspath(os.path.join(script_dir, '..', '..', '..'))
+sys.path.insert(0, project_root)
 from atomsurf.protein import *  # This imports the necessary classes for loading the data
 
 def get_protein_stats(protein_id, data_dir):
@@ -103,9 +105,9 @@ def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320,
 
 def main():
     parser = argparse.ArgumentParser(description='Create a filtered subset of the MaSIF-site dataset based on graph properties')
-    parser.add_argument('--data_dir', type=str, default='/home/tamara/data/masif_site',
+    parser.add_argument('--data_dir', type=str, default='/root/atomsurf/masif_site_data',
                         help='Path to the original dataset')
-    parser.add_argument('--output_dir', type=str, default='/home/tamara/data/masif_site_filtered',
+    parser.add_argument('--output_dir', type=str, default='/root/atomsurf/masif_site_data/filtered_splits',
                         help='Path to save the filtered dataset')
     parser.add_argument('--min_size', type=int, default=120,
                         help='Minimum graph size (number of nodes)')

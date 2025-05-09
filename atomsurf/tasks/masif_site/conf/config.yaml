@@ -15,17 +15,20 @@ hydra:
   job:
     chdir: False
   searchpath:
-    - /home/tamara/atomsurf/atomsurf/tasks/shared_conf
+#    - /home/tamara/atomsurf/atomsurf/tasks/shared_conf
+    - /root/atomsurf/atomsurf/tasks/shared_conf
 
 # general params
 seed: 2024
 run_name: default
-data_dir: /home/tamara/data/masif_site
-out_dir: /home/tamara/data/masif_site  # does not work for me with chdir=False
+#data_dir: /home/tamara/data/masif_site
+#out_dir: /home/tamara/data/masif_site  # does not work for me with chdir=False
+data_dir: /root/atomsurf/masif_site_data
+out_dir: /root/atomsurf/masif_site_data  # does not work for me with chdir=False
 log_dir: "./"
 test_freq: 5
 epochs: 200
-devices: [8, 9]
+devices: [0, 1]
 strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"
 min_batch_size: 2

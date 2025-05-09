@@ -69,16 +69,17 @@ class MasifSiteDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         dataset = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader)
         # Use BatchSampler with RandomSampler for more controlled batching
-        random_sampler = RandomSampler(dataset)
-        batch_sampler = BatchSampler(random_sampler, 
-                                   batch_size=self.cfg.loader.batch_size,
-                                   drop_last=True)
-        return DataLoader(dataset, 
-                        batch_sampler=batch_sampler,
-                        num_workers=self.cfg.loader.num_workers,
-                        pin_memory=self.cfg.loader.pin_memory,
-                        prefetch_factor=self.cfg.loader.prefetch_factor,
-                        collate_fn=collate_fn)
+        #random_sampler = RandomSampler(dataset)
+        #batch_sampler = BatchSampler(random_sampler, 
+        #                           batch_size=self.cfg.loader.batch_size,
+        #                           drop_last=True)
+        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args) 
+        #return DataLoader(dataset, 
+        #                batch_sampler=batch_sampler,
+        #                num_workers=self.cfg.loader.num_workers,
+        #                pin_memory=self.cfg.loader.pin_memory,
+        #                prefetch_factor=self.cfg.loader.prefetch_factor,
+        #                collate_fn=collate_fn)
 
     def val_dataloader(self):
         dataset = MasifSiteDataset(self.val_sys, self.surface_loader, self.graph_loader)
