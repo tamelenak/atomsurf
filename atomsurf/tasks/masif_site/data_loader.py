@@ -13,13 +13,15 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(script_dir, '..', '..', '..'))
 
 from atomsurf.utils.data_utils import SurfaceLoader, GraphLoader, AtomBatch, update_model_input_dim
+from uniform_batch_sampler import UniformBatchSampler
 
 
 class MasifSiteDataset(Dataset):
-    def __init__(self, systems, surface_builder, graph_builder):
+    def __init__(self, systems, surface_builder, graph_builder, verbose=False):
         self.systems = systems
         self.surface_builder = surface_builder
         self.graph_builder = graph_builder
+        self.verbose = verbose
 
     def __len__(self):
         return len(self.systems)
@@ -29,12 +31,27 @@ class MasifSiteDataset(Dataset):
         surface = self.surface_builder.load(pocket)
         graph = self.graph_builder.load(pocket)
         if surface is None or graph is None:
+            if self.verbose:
+                print(f"Failed to load: {pocket} (surface: {surface is None}, graph: {graph is None})")
             return None
-        item = Data(surface=surface, graph=graph, label=surface.iface_labels)
+        item = Data(surface=surface, graph=graph, label=surface.iface_labels if hasattr(surface, 'iface_labels') else None)
+        assert item is not None, f"Got None at idx {idx}"
         return item
 
 
 def collate_fn(batch):
+    # Filter out None values (failed loads)
+    batch_before = batch.copy()
+    batch = [x for x in batch if x is not None]
+    if len(batch) != len(batch_before):
+        print(f"Batch size before filtering: {len(batch)}")
+        print(f"Batch size after filtering: {len(batch)}")
+    if len(batch) == 0:
+        print("Warning: Empty batch after filtering!")
+        # Create a minimal empty batch to avoid errors
+        return AtomBatch()
+    
+    assert all(x is not None for x in batch), "Found None in batch!"
     return AtomBatch.from_data_list(batch)
 
 class MasifSiteDataModule(pl.LightningDataModule):
@@ -42,6 +59,9 @@ class MasifSiteDataModule(pl.LightningDataModule):
         super().__init__()
         self.surface_loader = SurfaceLoader(cfg.cfg_surface)
         self.graph_loader = GraphLoader(cfg.cfg_graph)
+        
+        # Set verbose mode (default to False if not specified in config)
+        self.verbose = cfg.verbose if hasattr(cfg, 'verbose') else False
 
         # Get the right systems
         # script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -63,30 +83,22 @@ class MasifSiteDataModule(pl.LightningDataModule):
                             'prefetch_factor': self.cfg.loader.prefetch_factor,
                             'collate_fn': collate_fn}
 
-        dataset_temp = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader)
+        dataset_temp = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader, verbose=False)
         update_model_input_dim(cfg, dataset_temp=dataset_temp)
 
     def train_dataloader(self):
-        dataset = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader)
-        # Use BatchSampler with RandomSampler for more controlled batching
-        #random_sampler = RandomSampler(dataset)
-        #batch_sampler = BatchSampler(random_sampler, 
-        #                           batch_size=self.cfg.loader.batch_size,
-        #                           drop_last=True)
-        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args) 
-        #return DataLoader(dataset, 
-        #                batch_sampler=batch_sampler,
-        #                num_workers=self.cfg.loader.num_workers,
-        #                pin_memory=self.cfg.loader.pin_memory,
-        #                prefetch_factor=self.cfg.loader.prefetch_factor,
-        #                collate_fn=collate_fn)
+        dataset = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader, verbose=self.verbose)
+        print(f"Training dataset size: {len(self.train_sys)}")
+        print(f"Batch size: {self.cfg.loader.batch_size}")
+        print(f"Expected batches per epoch: {len(self.train_sys) // self.cfg.loader.batch_size}")
+        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args)
 
     def val_dataloader(self):
-        dataset = MasifSiteDataset(self.val_sys, self.surface_loader, self.graph_loader)
+        dataset = MasifSiteDataset(self.val_sys, self.surface_loader, self.graph_loader, verbose=self.verbose)
         return DataLoader(dataset, shuffle=False, **self.loader_args)
 
     def test_dataloader(self):
-        dataset = MasifSiteDataset(self.test_sys, self.surface_loader, self.graph_loader)
+        dataset = MasifSiteDataset(self.test_sys, self.surface_loader, self.graph_loader, verbose=self.verbose)
         return DataLoader(dataset, shuffle=False, **self.loader_args)
 
 
@@ -121,10 +133,10 @@ if __name__ == '__main__':
 
     # test_systems_list = os.path.join(masif_site_data_dir, 'test_list.txt')
     # test_sys = [name.strip() for name in open(test_systems_list, 'r').readlines()]
-    # dataset = MasifSiteDataset(test_sys, surface_loader, graph_loader)
+    # dataset = MasifSiteDataset(test_sys, surface_loader, graph_loader, verbose=False)
     # a = dataset[0]
 
-    loader_cfg = omegaconf.DictConfig({"num_workers": 2,
+    loader_cfg = omegaconf.DictConfig({"num_workers": 0,
                                        "batch_size": 4,
                                        "pin_memory": False,
                                        "prefetch_factor": 2,

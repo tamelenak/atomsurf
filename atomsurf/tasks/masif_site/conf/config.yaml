@@ -28,15 +28,16 @@ out_dir: /root/atomsurf/masif_site_data  # does not work for me with chdir=False
 log_dir: "./"
 test_freq: 5
 epochs: 200
-devices: [0, 1]
+devices: [0]
 strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"
 min_batch_size: 2
 use_wandb: False
+verbose: true
 
 # loader params
 loader:
-  num_workers: 8
+  num_workers: 16
   batch_size: 64
   pin_memory: True
   prefetch_factor: 4

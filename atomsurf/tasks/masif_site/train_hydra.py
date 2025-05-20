@@ -12,6 +12,8 @@ from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 if __name__ == '__main__':
     sys.path.append(str(Path(__file__).absolute().parents[3]))
 
+from batch_stats_logger import BatchStatsLogger
+
 from atomsurf.utils.callbacks import CommandLoggerCallback, add_wandb_logger
 from pl_model import MasifSiteModule
 from data_loader import MasifSiteDataModule
@@ -59,7 +61,7 @@ def main(cfg=None):
     early_stop_callback = pl.callbacks.EarlyStopping(monitor=cfg.train.to_monitor,
                                                      patience=cfg.train.early_stoping_patience,
                                                      mode='max')
-    callbacks = [lr_logger, checkpoint_callback, early_stop_callback, CommandLoggerCallback(command)]
+    callbacks = [lr_logger, checkpoint_callback, early_stop_callback, CommandLoggerCallback(command), BatchStatsLogger("batch_stats.csv")]
 
     # Use the accelerator from config, defaulting to CPU if not specified
     params = {

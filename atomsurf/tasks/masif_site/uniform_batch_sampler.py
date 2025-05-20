@@ -15,7 +15,8 @@ class UniformBatchSampler(Sampler):
                  protein_ids: List[str],
                  batch_size: int,
                  num_bins: int = 5,
-                 shuffle: bool = True):
+                 shuffle: bool = True,
+                 drop_last: bool = False):
         """
         Args:
             data_dir: Path to the dataset directory
@@ -23,9 +24,11 @@ class UniformBatchSampler(Sampler):
             batch_size: Number of proteins per batch
             num_bins: Number of size bins to create
             shuffle: Whether to shuffle proteins within bins
+            drop_last: Whether to drop the last incomplete batch
         """
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.drop_last = drop_last
         self.protein_sizes = {}
         
         # Get size of each protein

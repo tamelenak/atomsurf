@@ -43,12 +43,12 @@ class MasifSiteModule(AtomPLModule):
 
     def step(self, batch):
         if batch.num_graphs < self.hparams.cfg.min_batch_size:
-            return None, None, None
+            return None, None, None, None
         labels = torch.concatenate(batch.label)
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
-        
+        accuracy = compute_accuracy(predictions=outputs_concat, labels=labels_concat, add_sigmoid=True)
         # Log batch statistics
         if self.training:
             if hasattr(batch.graph, 'node_len'):
@@ -57,8 +57,16 @@ class MasifSiteModule(AtomPLModule):
                     "size/points": len(labels),
                     "size/loss": loss.item()
                 }, on_epoch=True, batch_size=len(labels))
-            
-        return loss, outputs_concat, labels_concat
+        return loss, outputs_concat, labels_concat, accuracy
+
+    def training_step(self, batch, batch_idx):
+        loss, logits, labels, accuracy = self.step(batch)
+        if loss is None:
+            return None
+        self.log_dict({"loss/train": loss.item()},
+                      on_step=True, on_epoch=True, prog_bar=False, batch_size=len(logits))
+        self.train_res.append((logits.detach().cpu(), labels.detach().cpu()))
+        return {"loss": loss, "accuracy": accuracy}
 
     def get_metrics(self, logits, labels, prefix):
         logits, labels = torch.cat(logits, dim=0), torch.cat(labels, dim=0)

@@ -30,15 +30,25 @@ def get_protein_stats(protein_id, data_dir):
         print(f"Error loading {graph_file}: {str(e)}")
     return None
 
+def has_valid_surface(protein_id, data_dir):
+    surface_file = os.path.join(data_dir, 'surfaces_0.1_False', f"{protein_id}.pt")
+    if not os.path.exists(surface_file):
+        return False
+    try:
+        data = torch.load(surface_file)
+        return hasattr(data, 'verts') and data.verts is not None
+    except Exception as e:
+        print(f"Error loading surface file {surface_file}: {str(e)}")
+        return False
+
 def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320, 
                          min_density=0.05, max_density=0.5, 
                          min_degree=10, max_degree=40):
     """Create a subset of proteins filtered by graph properties"""
-    splits_dir = os.path.join(data_dir, 'splits')
+    splits_dir = os.path.join(data_dir, 'splits_full')
     
     # Create output directory and its splits subdirectory
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'splits'), exist_ok=True)
     
     # Read all proteins
     with open(os.path.join(splits_dir, 'train_list.txt'), 'r') as f:
@@ -54,7 +64,7 @@ def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320,
     excluded_train = {'size': 0, 'density': 0, 'degree': 0}
     for protein in train_proteins:
         stats = get_protein_stats(protein, data_dir)
-        if stats:
+        if stats and has_valid_surface(protein, data_dir):
             if not (min_size <= stats['num_nodes'] <= max_size):
                 excluded_train['size'] += 1
                 continue
@@ -71,7 +81,7 @@ def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320,
     excluded_test = {'size': 0, 'density': 0, 'degree': 0}
     for protein in test_proteins:
         stats = get_protein_stats(protein, data_dir)
-        if stats:
+        if stats and has_valid_surface(protein, data_dir):
             if not (min_size <= stats['num_nodes'] <= max_size):
                 excluded_test['size'] += 1
                 continue
@@ -84,9 +94,9 @@ def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320,
             filtered_test.append(protein)
     
     # Save new splits
-    with open(os.path.join(output_dir, 'splits', 'train_list.txt'), 'w') as f:
+    with open(os.path.join(output_dir, 'train_list.txt'), 'w') as f:
         f.write('\n'.join(filtered_train))
-    with open(os.path.join(output_dir, 'splits', 'test_list.txt'), 'w') as f:
+    with open(os.path.join(output_dir, 'test_list.txt'), 'w') as f:
         f.write('\n'.join(filtered_test))
     
     # Print statistics
@@ -107,11 +117,11 @@ def main():
     parser = argparse.ArgumentParser(description='Create a filtered subset of the MaSIF-site dataset based on graph properties')
     parser.add_argument('--data_dir', type=str, default='/root/atomsurf/masif_site_data',
                         help='Path to the original dataset')
-    parser.add_argument('--output_dir', type=str, default='/root/atomsurf/masif_site_data/filtered_splits',
+    parser.add_argument('--output_dir', type=str, default='/root/atomsurf/masif_site_data/splits',
                         help='Path to save the filtered dataset')
-    parser.add_argument('--min_size', type=int, default=120,
+    parser.add_argument('--min_size', type=int, default=100,
                         help='Minimum graph size (number of nodes)')
-    parser.add_argument('--max_size', type=int, default=320,
+    parser.add_argument('--max_size', type=int, default=400,
                         help='Maximum graph size (number of nodes)')
     parser.add_argument('--min_density', type=float, default=0.05,
                         help='Minimum graph density')
