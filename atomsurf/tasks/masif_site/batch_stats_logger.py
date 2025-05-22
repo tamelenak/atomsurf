@@ -1,5 +1,6 @@
 import csv
 import pytorch_lightning as pl
+import torch
 
 class BatchStatsLogger(pl.Callback):
     def __init__(self, filename="batch_stats.csv"):
@@ -14,13 +15,20 @@ class BatchStatsLogger(pl.Callback):
         epoch = trainer.current_epoch
         loss = outputs["loss"].item() if isinstance(outputs, dict) and "loss" in outputs else outputs
         accuracy = outputs["accuracy"] if isinstance(outputs, dict) and "accuracy" in outputs else None
-        try:
-            data_list = batch.to_data_list()
-        except Exception:
-            data_list = []
-        vertex_count = sum(len(d.surface.verts) for d in data_list if hasattr(d.surface, "verts"))
-        node_count = sum(len(d.graph.x) for d in data_list if hasattr(d.graph, "x"))
-        batch_size = len(data_list)
+
+        # Vertex count: total number of points/vertices in the batch
+        if hasattr(batch, "label"):
+            try:
+                concatenated_labels = torch.cat(batch.label) if isinstance(batch.label, (list, tuple)) else batch.label
+                vertex_count = len(concatenated_labels)
+            except Exception:
+                vertex_count = 0
+        else:
+            vertex_count = 0
+
+        node_count = float(batch.graph.node_len.float().mean().item()) if hasattr(batch, "graph") and hasattr(batch.graph, "node_len") else 0
+        batch_size = batch.num_graphs if hasattr(batch, "num_graphs") else 0
+
         with open(self.filename, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([

@@ -11,35 +11,33 @@ class UniformBatchSampler(Sampler):
     """
     
     def __init__(self, 
-                 data_dir: str,
-                 protein_ids: List[str],
+                 dataset,
                  batch_size: int,
                  num_bins: int = 5,
                  shuffle: bool = True,
                  drop_last: bool = False):
         """
         Args:
-            data_dir: Path to the dataset directory
-            protein_ids: List of protein IDs to sample from
+            dataset: The MasifSiteDataset instance
             batch_size: Number of proteins per batch
             num_bins: Number of size bins to create
             shuffle: Whether to shuffle proteins within bins
             drop_last: Whether to drop the last incomplete batch
         """
+        self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
-        self.protein_sizes = {}
         
-        # Get size of each protein
-        for protein_id in protein_ids:
-            graph_file = os.path.join(data_dir, 'rgraph', f"{protein_id}.pt")
+        # Get size of each protein by loading the first graph
+        self.protein_sizes = {}
+        for idx in range(len(dataset)):
             try:
-                data = torch.load(graph_file)
-                if hasattr(data, 'num_nodes'):
-                    self.protein_sizes[protein_id] = data.num_nodes
+                data = dataset[idx]
+                if data is not None and hasattr(data.graph, 'num_nodes'):
+                    self.protein_sizes[idx] = data.graph.num_nodes
             except Exception as e:
-                print(f"Error loading {graph_file}: {str(e)}")
+                print(f"Error loading protein at index {idx}: {str(e)}")
         
         # Sort proteins by size
         sorted_proteins = sorted(self.protein_sizes.items(), key=lambda x: x[1])
@@ -83,8 +81,8 @@ class UniformBatchSampler(Sampler):
         if self.shuffle:
             np.random.shuffle(all_batches)
         
-        # Flatten batches into a list of protein IDs
-        return iter([protein_id for batch in all_batches for protein_id in batch])
+        # Flatten batches into a list of indices
+        return iter([idx for batch in all_batches for idx in batch])
     
     def __len__(self):
         return self.num_batches * self.batch_size
@@ -95,8 +93,7 @@ from uniform_batch_sampler import UniformBatchSampler
 
 # Create the sampler
 sampler = UniformBatchSampler(
-    data_dir='/path/to/data',
-    protein_ids=train_proteins,  # Your list of training protein IDs
+    dataset=your_dataset,
     batch_size=32,
     num_bins=5,  # Adjust based on your dataset size
     shuffle=True
