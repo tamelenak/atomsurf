@@ -61,7 +61,7 @@ def plot_size_correlation(df, output_dir):
 def analyze_dataset(data_dir, output_dir):
     """Analyze the dataset for outliers and statistics"""
     os.makedirs(output_dir, exist_ok=True)
-    splits_dir = os.path.join(data_dir, 'splits_bak')
+    splits_dir = os.path.join(data_dir, 'splits_filtered')
     
     # Read protein lists
     with open(os.path.join(splits_dir, 'train_list.txt'), 'r') as f:
@@ -133,7 +133,7 @@ def analyze_dataset(data_dir, output_dir):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Analyze MaSIF-site dataset')
-    parser.add_argument('--data_dir', type=str, default='/home/tamara/data/masif_site',
+    parser.add_argument('--data_dir', type=str, default='/root/atomsurf/masif_site_data',
                         help='Path to the dataset')
     parser.add_argument('--output_dir', type=str, default='dataset_analysis',
                         help='Path to save analysis results')

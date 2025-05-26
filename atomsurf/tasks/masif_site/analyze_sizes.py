@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import sys
 
-sys.path.append(os.path.abspath('atomsurf'))
+sys.path.append(os.path.abspath('atomsurf/atomsurf'))
 from atomsurf.protein import *  # This imports the necessary classes for loading the data
 
 def get_sizes(protein_id, surface_dir, graph_dir):
@@ -36,11 +36,11 @@ def get_sizes(protein_id, surface_dir, graph_dir):
 
 def plot_size_distribution(sizes, title, filename):
     """Create and save a histogram of sizes"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(5, 3))
     plt.hist(sizes, bins=50, edgecolor='black')
-    plt.title(title)
-    plt.xlabel('Number of Vertices/Nodes')
-    plt.ylabel('Count')
+    plt.title(title, fontsize=18)
+    plt.xlabel('Number of Vertices/Nodes', fontsize=16)
+    plt.ylabel('Count', fontsize=16)
     
     mean_val = np.mean(sizes)
     median_val = np.median(sizes)
@@ -50,26 +50,30 @@ def plot_size_distribution(sizes, title, filename):
     plt.axvline(median_val, color='g', linestyle='dashed', linewidth=2,
                 label=f'Median: {median_val:.0f}')
     
-    plt.legend()
+    plt.legend(fontsize=14)
     plt.grid(True, alpha=0.3)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.savefig(filename)
     plt.close()
 
 def plot_correlation(surface_sizes, graph_sizes, protein_ids):
     """Create a scatter plot showing correlation between surface and graph sizes"""
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(8, 5))
     plt.scatter(surface_sizes, graph_sizes, alpha=0.5)
-    plt.xlabel('Surface Size (vertices)')
-    plt.ylabel('Graph Size (nodes)')
-    plt.title('Correlation between Surface and Graph Sizes')
+    plt.xlabel('Surface Size (vertices)', fontsize=16)
+    plt.ylabel('Graph Size (nodes)', fontsize=16)
+    plt.title('Correlation between Surface and Graph Sizes', fontsize=18)
     
     # Add correlation coefficient
     corr = np.corrcoef(surface_sizes, graph_sizes)[0,1]
     plt.text(0.05, 0.95, f'Correlation: {corr:.2f}', 
-             transform=plt.gca().transAxes)
+             transform=plt.gca().transAxes, fontsize=14)
     
     # Add grid and save
     plt.grid(True, alpha=0.3)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.savefig('size_correlation.png')
     plt.close()
     
@@ -93,7 +97,7 @@ def analyze_sizes(data_dir):
     """Analyze both surface and graph sizes"""
     surface_dir = os.path.join(data_dir, 'surfaces_0.1_False')
     graph_dir = os.path.join(data_dir, 'rgraph')
-    splits_dir = os.path.join(data_dir, 'splits')
+    splits_dir = os.path.join(data_dir, 'splits_filtered')
     
     print(f"\nAnalyzing protein sizes...")
     print(f"Surface directory: {surface_dir}")
@@ -163,5 +167,5 @@ def analyze_sizes(data_dir):
     print(f"Large: {graph_percentiles[2]:.0f} - {graph_sizes.max():.0f}")
 
 if __name__ == '__main__':
-    data_dir = '/home/tamara/data/masif_site'
+    data_dir = '/root/atomsurf/masif_site_data'
     analyze_sizes(data_dir) 

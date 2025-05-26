@@ -53,7 +53,7 @@ class MasifSiteModule(AtomPLModule):
         if self.training:
             if hasattr(batch.graph, 'node_len'):
                 self.log_dict({
-                    "size/nodes": batch.graph.node_len.float().mean(),
+                    "size/nodes": batch.graph.node_len.float().sum(),
                     "size/points": len(labels),
                     "size/loss": loss.item()
                 }, on_epoch=True, batch_size=len(labels))

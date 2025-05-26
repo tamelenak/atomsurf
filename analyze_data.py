@@ -65,8 +65,8 @@ def analyze_surface(file_path):
 
 def main():
     # Analyze graphs
-    graph_dir = Path('data/masif_site/rgraph')
-    surface_dir = Path('data/masif_site/surfaces_0.1_False')
+    graph_dir = Path('masif_site_data/rgraph')
+    surface_dir = Path('masif_site_data/surfaces_0.1_False')
     
     print("\n=== Analyzing all graph files ===")
     graph_stats = []

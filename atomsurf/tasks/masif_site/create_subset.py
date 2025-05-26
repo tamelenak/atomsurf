@@ -45,7 +45,7 @@ def create_filtered_subset(data_dir, output_dir, min_size=120, max_size=320,
                          min_density=0.05, max_density=0.5, 
                          min_degree=10, max_degree=40):
     """Create a subset of proteins filtered by graph properties"""
-    splits_dir = os.path.join(data_dir, 'splits_full')
+    splits_dir = os.path.join(data_dir, 'splits')
     
     # Create output directory and its splits subdirectory
     os.makedirs(output_dir, exist_ok=True)
@@ -117,7 +117,7 @@ def main():
     parser = argparse.ArgumentParser(description='Create a filtered subset of the MaSIF-site dataset based on graph properties')
     parser.add_argument('--data_dir', type=str, default='/root/atomsurf/masif_site_data',
                         help='Path to the original dataset')
-    parser.add_argument('--output_dir', type=str, default='/root/atomsurf/masif_site_data/splits',
+    parser.add_argument('--output_dir', type=str, default='/root/atomsurf/masif_site_data/splits_filtered',
                         help='Path to save the filtered dataset')
     parser.add_argument('--min_size', type=int, default=100,
                         help='Minimum graph size (number of nodes)')

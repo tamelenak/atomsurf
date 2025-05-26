@@ -26,7 +26,7 @@ class BatchStatsLogger(pl.Callback):
         else:
             vertex_count = 0
 
-        node_count = float(batch.graph.node_len.float().mean().item()) if hasattr(batch, "graph") and hasattr(batch.graph, "node_len") else 0
+        node_count = float(batch.graph.node_len.float().sum().item()) if hasattr(batch, "graph") and hasattr(batch.graph, "node_len") else 0
         batch_size = batch.num_graphs if hasattr(batch, "num_graphs") else 0
 
         with open(self.filename, "a", newline="") as f:

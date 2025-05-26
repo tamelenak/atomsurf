@@ -27,7 +27,7 @@ data_dir: /root/atomsurf/masif_site_data
 out_dir: /root/atomsurf/masif_site_data  # does not work for me with chdir=False
 log_dir: "./"
 test_freq: 5
-epochs: 200
+epochs: 50
 devices: [0]
 strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"
@@ -58,7 +58,7 @@ train:
   # # epochs and batch_size
   max_steps: -1
   auto_lr_find: False
-  log_every_n_steps: 50
+  log_every_n_steps: 1
   # # detect NaNs
   detect_anomaly: False
   # # debugging
