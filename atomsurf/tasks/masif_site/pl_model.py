@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from atomsurf.tasks.masif_site.model import MasifSiteNet
 from atomsurf.utils.learning_utils import AtomPLModule
 from atomsurf.utils.metrics import compute_accuracy, compute_auroc
+from atomsurf.tasks.masif_site.focal_loss import masif_site_focal_loss, weighted_masif_site_loss
 
 
 def masif_site_loss(preds, labels):

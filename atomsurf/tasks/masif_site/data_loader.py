@@ -27,14 +27,14 @@ class MasifSiteDataset(Dataset):
         return len(self.systems)
 
     def __getitem__(self, idx):
-        pocket = self.systems[idx]
-        surface = self.surface_builder.load(pocket)
-        graph = self.graph_builder.load(pocket)
+        protein_name = self.systems[idx]
+        surface = self.surface_builder.load(protein_name)
+        graph = self.graph_builder.load(protein_name)
         if surface is None or graph is None:
             if self.verbose:
-                print(f"Failed to load: {pocket} (surface: {surface is None}, graph: {graph is None})")
+                print(f"Failed to load: {protein_name} (surface: {surface is None}, graph: {graph is None})")
             return None
-        item = Data(surface=surface, graph=graph, label=surface.iface_labels if hasattr(surface, 'iface_labels') else None)
+        item = Data(surface=surface, graph=graph, label=surface.iface_labels if hasattr(surface, 'iface_labels') else None, protein_name=protein_name)
         assert item is not None, f"Got None at idx {idx}"
         return item
 
@@ -169,7 +169,7 @@ if __name__ == '__main__':
     t0 = time.time()
     for i, batch in enumerate(loader):
         pass
-        a = batch.pocket
+        a = batch.protein_name
         batch = batch.to(device)
         torch.cuda.synchronize()
 

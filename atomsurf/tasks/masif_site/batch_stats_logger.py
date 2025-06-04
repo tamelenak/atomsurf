@@ -8,7 +8,7 @@ class BatchStatsLogger(pl.Callback):
         with open(self.filename, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "epoch", "batch_idx", "loss", "accuracy", "vertex_count", "node_count", "batch_size"
+                "epoch", "batch_idx", "loss", "accuracy", "vertex_count", "node_count", "batch_size", "protein_names"
             ])
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
@@ -29,8 +29,12 @@ class BatchStatsLogger(pl.Callback):
         node_count = float(batch.graph.node_len.float().sum().item()) if hasattr(batch, "graph") and hasattr(batch.graph, "node_len") else 0
         batch_size = batch.num_graphs if hasattr(batch, "num_graphs") else 0
 
+        # Extract protein names from the batch
+        protein_names = getattr(batch, 'protein_name', [])
+        protein_names_str = ";".join(protein_names) if protein_names else ""
+
         with open(self.filename, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
-                epoch, batch_idx, loss, accuracy, vertex_count, node_count, batch_size
+                epoch, batch_idx, loss, accuracy, vertex_count, node_count, batch_size, protein_names_str
             ])
