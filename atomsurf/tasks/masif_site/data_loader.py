@@ -13,7 +13,7 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(script_dir, '..', '..', '..'))
 
 from atomsurf.utils.data_utils import SurfaceLoader, GraphLoader, AtomBatch, update_model_input_dim
-from uniform_batch_sampler import UniformBatchSampler
+#from uniform_batch_sampler import UniformBatchSampler
 
 
 class MasifSiteDataset(Dataset):

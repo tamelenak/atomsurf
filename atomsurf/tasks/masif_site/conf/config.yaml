@@ -21,6 +21,7 @@ hydra:
 # general params
 seed: 2024
 run_name: default
+comment: ""  # Add your experiment comment here
 #data_dir: /home/tamara/data/masif_site
 #out_dir: /home/tamara/data/masif_site  # does not work for me with chdir=False
 data_dir: /root/atomsurf/masif_site_data

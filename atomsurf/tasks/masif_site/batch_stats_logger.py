@@ -1,15 +1,39 @@
 import csv
 import pytorch_lightning as pl
 import torch
+from queue import Queue
+from threading import Thread
+import time
 
 class BatchStatsLogger(pl.Callback):
     def __init__(self, filename="batch_stats.csv"):
         self.filename = filename
+        self.queue = Queue()
+        self.writing = True
+        
+        # Initialize CSV file
         with open(self.filename, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
                 "epoch", "batch_idx", "loss", "accuracy", "vertex_count", "node_count", "batch_size", "protein_names"
             ])
+        
+        # Start writer thread
+        self.writer_thread = Thread(target=self._write_worker, daemon=True)
+        self.writer_thread.start()
+
+    def _write_worker(self):
+        while self.writing:
+            try:
+                # Get data from queue with timeout
+                data = self.queue.get(timeout=1.0)
+                with open(self.filename, "a", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(data)
+                self.queue.task_done()
+            except:
+                # Timeout or other error, just continue
+                continue
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         epoch = trainer.current_epoch
@@ -33,8 +57,12 @@ class BatchStatsLogger(pl.Callback):
         protein_names = getattr(batch, 'protein_name', [])
         protein_names_str = ";".join(protein_names) if protein_names else ""
 
-        with open(self.filename, "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                epoch, batch_idx, loss, accuracy, vertex_count, node_count, batch_size, protein_names_str
-            ])
+        # Add data to queue instead of writing directly
+        self.queue.put([
+            epoch, batch_idx, loss, accuracy, vertex_count, node_count, batch_size, protein_names_str
+        ])
+
+    def on_train_end(self, trainer, pl_module):
+        # Stop writer thread
+        self.writing = False
+        self.writer_thread.join()

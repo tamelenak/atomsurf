@@ -61,7 +61,14 @@ def main(cfg=None):
     early_stop_callback = pl.callbacks.EarlyStopping(monitor=cfg.train.to_monitor,
                                                      patience=cfg.train.early_stoping_patience,
                                                      mode='max')
-    callbacks = [lr_logger, checkpoint_callback, early_stop_callback, CommandLoggerCallback(command), BatchStatsLogger("batch_stats.csv")]
+    
+    callbacks = [
+        lr_logger, 
+        checkpoint_callback, 
+        early_stop_callback, 
+        CommandLoggerCallback(command), 
+        BatchStatsLogger("batch_stats.csv")
+    ]
 
     # Use the accelerator from config, defaulting to CPU if not specified
     params = {
@@ -84,21 +91,13 @@ def main(cfg=None):
         accumulate_grad_batches=cfg.train.accumulate_grad_batches,
         check_val_every_n_epoch=cfg.train.check_val_every_n_epoch,
         val_check_interval=cfg.train.val_check_interval,
-        # just verbose to maybe be used
-        # limit_train_batches=3,
-        # limit_val_batches=3,
         limit_train_batches=cfg.train.limit_train_batches,
         limit_val_batches=cfg.train.limit_val_batches,
-        # auto_lr_find=cfg.train.auto_lr_find,
         log_every_n_steps=cfg.train.log_every_n_steps,
         max_steps=cfg.train.max_steps,
-        # gradient clipping
         gradient_clip_val=cfg.train.gradient_clip_val,
-        # detect NaNs
         detect_anomaly=cfg.train.detect_anomaly,
-        # debugging
         overfit_batches=cfg.train.overfit_batches,
-        # gpu
         **params,
     )
 
