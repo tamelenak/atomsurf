@@ -177,8 +177,8 @@ def generate_report(df, protein_stats, batch_effects, problematic_proteins, dive
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze batch composition effects on training loss')
-    parser.add_argument('csv_path', help='Path to batch_stats.csv file')
-    parser.add_argument('--save_prefix', default='batch_analysis', help='Prefix for saved files')
+    parser.add_argument('csv_path', default='batch_stats.csv', help='Path to batch_stats.csv file')
+    parser.add_argument('--save_prefix', default='analysis/batch_analysis', help='Prefix for saved files')
     
     args = parser.parse_args()
     

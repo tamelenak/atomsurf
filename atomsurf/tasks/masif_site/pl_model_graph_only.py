@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 # project
-from atomsurf.tasks.masif_site.model import MasifSiteNet
+from atomsurf.tasks.masif_site.model_graph_only_wrapper import GraphOnlyMasifSiteWrapper
 from atomsurf.utils.learning_utils import AtomPLModule
 from atomsurf.utils.metrics import compute_accuracy, compute_auroc
 from atomsurf.tasks.masif_site.focal_loss import masif_site_focal_loss, weighted_masif_site_loss
@@ -13,9 +13,7 @@ from atomsurf.tasks.masif_site.instability_tracker import InstabilityTracker
 
 
 def masif_site_loss(preds, labels):
-    # Inspired from dmasif https://github.com/FreyrS/dMaSIF/blob/master/data_iteration.py#L158
-
-    # Get our predictions and corresponding binary labels
+    # Same loss function as the original
     pos_preds = preds[labels == 1]
     neg_preds = preds[labels == 0]
     pos_labels = torch.ones_like(pos_preds)
@@ -37,11 +35,13 @@ def masif_site_loss(preds, labels):
     return loss, preds_concat, labels_concat
 
 
-class MasifSiteModule(AtomPLModule):
+class GraphOnlyMasifSiteModule(AtomPLModule):
     def __init__(self, cfg) -> None:
         super().__init__()
         self.save_hyperparameters()
-        self.model = MasifSiteNet(cfg_encoder=cfg.encoder, cfg_head=cfg.cfg_head)
+        
+        # Use the wrapper around the standard MasifSiteNet
+        self.model = GraphOnlyMasifSiteWrapper(cfg_encoder=cfg.encoder, cfg_head=cfg.cfg_head)
         
         # Configure loss function
         self.loss_type = getattr(cfg, 'loss_type', 'default')
@@ -50,7 +50,7 @@ class MasifSiteModule(AtomPLModule):
         
         # Initialize instability tracker
         self.instability_tracker = InstabilityTracker(
-            csv_path="experiment_tracker.csv"
+            csv_path="experiment_tracker_graph_only.csv"
         )
         
         # Store config for logging
@@ -59,11 +59,15 @@ class MasifSiteModule(AtomPLModule):
     def step(self, batch):
         if batch.num_graphs < self.hparams.cfg.min_batch_size:
             return None, None, None, None
+            
+        # Get labels from surface (same as original)
         labels = torch.concatenate(batch.label)
+        
+        # Forward pass through graph-only wrapper
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         
-        # Choose loss function based on configuration
+        # Use the same loss functions as original
         if self.loss_type == 'focal':
             loss, outputs_concat, labels_concat = masif_site_focal_loss(
                 outputs, labels, alpha=self.focal_alpha, gamma=self.focal_gamma
@@ -74,6 +78,7 @@ class MasifSiteModule(AtomPLModule):
             loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
             
         accuracy = compute_accuracy(predictions=outputs_concat, labels=labels_concat, add_sigmoid=True)
+        
         # Log batch statistics
         if self.training:
             if hasattr(batch.graph, 'node_len'):
@@ -122,7 +127,7 @@ class MasifSiteModule(AtomPLModule):
         
         # Log final experiment summary
         self.instability_tracker.log_final_experiment(
-            experiment_name=self.cfg.run_name,
+            experiment_name=f"{self.cfg.run_name}_graph_only",
             config=self.cfg,
             final_train_loss=final_train_loss.item() if final_train_loss is not None and hasattr(final_train_loss, 'item') else 0,
             final_val_loss=final_val_loss.item() if final_val_loss is not None and hasattr(final_val_loss, 'item') else None,
@@ -130,7 +135,7 @@ class MasifSiteModule(AtomPLModule):
             final_train_acc=final_train_acc.item() if final_train_acc is not None and hasattr(final_train_acc, 'item') else None,
             final_val_acc=final_val_acc.item() if final_val_acc is not None and hasattr(final_val_acc, 'item') else None,
             final_test_acc=final_test_acc.item() if final_test_acc is not None and hasattr(final_test_acc, 'item') else None,
-            comment=self.cfg.comment
+            comment=f"{self.cfg.comment} - Graph Only Comparison"
         )
 
     def get_metrics(self, logits, labels, prefix):
@@ -140,4 +145,4 @@ class MasifSiteModule(AtomPLModule):
         self.log_dict({
             f"auroc/{prefix}": auroc,
             f"acc/{prefix}": acc
-        }, on_epoch=True, batch_size=len(logits))
+        }, on_epoch=True, batch_size=len(logits)) 

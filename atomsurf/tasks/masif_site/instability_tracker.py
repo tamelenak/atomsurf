@@ -52,6 +52,7 @@ class InstabilityTracker:
             
         # Calculate CV for batches WITHIN each epoch
         epoch_batch_cvs = []
+        epoch_batch_zscores = []
         for epoch_batches in self.batches_per_epoch:
             if len(epoch_batches) > 1:  # Need at least 2 batches to calculate CV
                 batch_mean = np.mean(epoch_batches)
@@ -59,9 +60,22 @@ class InstabilityTracker:
                 if batch_mean > 0:
                     cv = batch_std / batch_mean
                     epoch_batch_cvs.append(cv)
+                # batch-level z-score instability
+                deltas = np.abs(np.diff(epoch_batches))
+                mean_delta = np.mean(deltas)
+                std_delta = np.std(deltas)
+                if std_delta == 0:
+                    z_score = 0.0
+                else:
+                    z_scores = (deltas - mean_delta) / std_delta
+                    z_score = np.mean(np.abs(z_scores))
+                epoch_batch_zscores.append(z_score)
         
         # Calculate mean CV across epochs
         mean_cv = np.mean(epoch_batch_cvs) if epoch_batch_cvs else 0
+        
+        # Calculate mean batch-level z-score instability
+        mean_batch_zscore = np.mean(epoch_batch_zscores) if epoch_batch_zscores else 0
         
         # Calculate z-score instability using epoch losses
         z_instability = self.z_score_instability(self.epoch_losses) if len(self.epoch_losses) > 1 else 0
@@ -69,6 +83,7 @@ class InstabilityTracker:
         return {
             'mean_cv': mean_cv,
             'z_score_instability': z_instability,
+            'mean_batch_zscore_instability': mean_batch_zscore,
             'total_epochs': len(self.batches_per_epoch)
         }
     
@@ -94,6 +109,7 @@ class InstabilityTracker:
             'final_test_acc': final_test_acc,
             'mean_cv': metrics.get('mean_cv', 0),
             'z_score_instability': metrics.get('z_score_instability', 0),
+            'mean_batch_zscore_instability': metrics.get('mean_batch_zscore_instability', 0),
             'comment': comment
         }
         

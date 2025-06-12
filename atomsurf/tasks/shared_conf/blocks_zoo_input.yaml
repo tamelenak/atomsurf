@@ -24,3 +24,9 @@ input_encoder_gvp:
   bp_gs_block: ${gvp_mp_double}
   s_post_block: ${cat_merge}
   g_post_block: ${cat_merge}
+
+input_encoder_graph_only:
+  _target_: atomsurf.networks.ProteinEncoderBlock
+  surface_encoder: None
+  graph_encoder: ${2layer_input_chunk}
+  message_passing: None

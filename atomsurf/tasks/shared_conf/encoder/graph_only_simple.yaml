@@ -1,0 +1,8 @@
+name: graph_only_simple
+
+blocks:
+  - ${input_encoder_graph_only}
+  - ${gcnonly}
+  - ${gcnonly}
+  - ${gcnonly}
+  - ${gcnonly} 

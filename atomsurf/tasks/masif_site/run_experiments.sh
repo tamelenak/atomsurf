@@ -1,20 +1,20 @@
 #!/bin/bash
 
 # Array of batch sizes to test
-BATCH_SIZES=(4 16 64)
+BATCH_SIZES=(4 8 16 32 64 128 256)
 
 # Array of learning rates to test
 LEARNING_RATES=(0.001)
 
 # Base experiment name
-BASE_NAME="batch_lr_experiment"
+BASE_NAME="full_dataset_batch_size_experiment"
 
 # Function to run a single experiment
 run_experiment() {
     local batch_size=$1
     local lr=$2
-    local run_name="${BASE_NAME}_bs${batch_size}_lr${lr}"
-    local comment="Testing batch size ${batch_size} with learning rate ${lr} on filtered data"
+    local run_name="${BASE_NAME}_bs${batch_size}"
+    local comment="Testing batch size ${batch_size} on full data"
     
     echo "Running experiment: ${run_name}"
     echo "Comment: ${comment}"

@@ -15,14 +15,14 @@ if __name__ == '__main__':
 from batch_stats_logger import BatchStatsLogger
 
 from atomsurf.utils.callbacks import CommandLoggerCallback, add_wandb_logger
-from pl_model import MasifSiteModule
+from pl_model_graph_only import GraphOnlyMasifSiteModule
 from data_loader import MasifSiteDataModule
 import warnings 
 warnings.filterwarnings("ignore")
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-@hydra.main(config_path="conf", config_name="config")
+@hydra.main(config_path="conf", config_name="config_graph_only")
 def main(cfg=None):
     command = f"python3 {' '.join(sys.argv)}"
     OmegaConf.register_new_resolver("eval", eval)
@@ -31,20 +31,20 @@ def main(cfg=None):
     seed = cfg.seed
     pl.seed_everything(seed, workers=True)
 
-    # init datamodule
+    # init datamodule - same as original, still loads both graph and surface for labels
     datamodule = MasifSiteDataModule(cfg)
 
-    # init model
-    model = MasifSiteModule(cfg)
+    # init graph-only model
+    model = GraphOnlyMasifSiteModule(cfg)
 
-    # init logger
+    # init logger with graph_only suffix
     version = TensorBoardLogger(save_dir=cfg.log_dir).version
-    version_name = f"version_{version}_{cfg.run_name}"
+    version_name = f"version_{version}_{cfg.run_name}_graph_only"
     tb_logger = TensorBoardLogger(save_dir=cfg.log_dir, version=version_name)
     loggers = [tb_logger]
 
     if cfg.use_wandb:
-        add_wandb_logger(loggers, projectname="masif_site")
+        add_wandb_logger(loggers, projectname="masif_site_graph_only")
 
     # callbacks
     lr_logger = pl.callbacks.LearningRateMonitor()
@@ -67,7 +67,7 @@ def main(cfg=None):
         checkpoint_callback, 
         early_stop_callback, 
         CommandLoggerCallback(command), 
-        BatchStatsLogger("batch_stats.csv")
+        BatchStatsLogger("batch_stats_graph_only.csv")
     ]
 
     # Use the accelerator from config, defaulting to CPU if not specified
