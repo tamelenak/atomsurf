@@ -8,9 +8,6 @@ class GraphOnlyMasifSiteWrapper(torch.nn.Module):
     """
     Wrapper around MasifSiteNet that uses GCN-only encoder blocks
     and maps graph predictions to surface points for loss computation.
-    
-    This enables fair comparison between hybrid (surface+graph) vs graph-only
-    approaches using the same GCN architecture.
     """
     
     def __init__(self, cfg_encoder, cfg_head):

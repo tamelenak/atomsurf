@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from atomsurf.tasks.masif_site.model import MasifSiteNet
 from atomsurf.utils.learning_utils import AtomPLModule
 from atomsurf.utils.metrics import compute_accuracy, compute_auroc
-from atomsurf.tasks.masif_site.focal_loss import masif_site_focal_loss, weighted_masif_site_loss
 from atomsurf.tasks.masif_site.instability_tracker import InstabilityTracker
 
 
@@ -48,11 +47,6 @@ class MasifSiteModule(AtomPLModule):
         self.save_hyperparameters()
         self.model = MasifSiteNet(cfg_encoder=cfg.encoder, cfg_head=cfg.cfg_head)
         
-        # Configure loss function
-        self.loss_type = getattr(cfg, 'loss_type', 'default')
-        self.focal_alpha = getattr(cfg, 'focal_alpha', 0.25)
-        self.focal_gamma = getattr(cfg, 'focal_gamma', 2.0)
-        
         # Initialize instability tracker
         self.instability_tracker = InstabilityTracker(
             csv_path="experiment_tracker.csv"
@@ -68,15 +62,8 @@ class MasifSiteModule(AtomPLModule):
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         
-        # Choose loss function based on configuration
-        if self.loss_type == 'focal':
-            loss, outputs_concat, labels_concat = masif_site_focal_loss(
-                outputs, labels, alpha=self.focal_alpha, gamma=self.focal_gamma
-            )
-        elif self.loss_type == 'weighted':
-            loss, outputs_concat, labels_concat = weighted_masif_site_loss(outputs, labels)
-        else:
-            loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
+        # Use the standard loss function
+        loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
             
         if loss is None:
             return None, None, None, None

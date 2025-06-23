@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from atomsurf.tasks.masif_site.model_graph_only_wrapper import GraphOnlyMasifSiteWrapper
 from atomsurf.utils.learning_utils import AtomPLModule
 from atomsurf.utils.metrics import compute_accuracy, compute_auroc
-from atomsurf.tasks.masif_site.focal_loss import masif_site_focal_loss, weighted_masif_site_loss
 from atomsurf.tasks.masif_site.instability_tracker import InstabilityTracker
 
 
@@ -40,13 +39,11 @@ class GraphOnlyMasifSiteModule(AtomPLModule):
         super().__init__()
         self.save_hyperparameters()
         
+        # Simple check: verify we're using graph-only config
+        print(f"Graph-only model: encoder={cfg.encoder.name}, run_name={cfg.run_name}")
+        
         # Use the wrapper around the standard MasifSiteNet
         self.model = GraphOnlyMasifSiteWrapper(cfg_encoder=cfg.encoder, cfg_head=cfg.cfg_head)
-        
-        # Configure loss function
-        self.loss_type = getattr(cfg, 'loss_type', 'default')
-        self.focal_alpha = getattr(cfg, 'focal_alpha', 0.25)
-        self.focal_gamma = getattr(cfg, 'focal_gamma', 2.0)
         
         # Initialize instability tracker
         self.instability_tracker = InstabilityTracker(
@@ -67,15 +64,8 @@ class GraphOnlyMasifSiteModule(AtomPLModule):
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         
-        # Use the same loss functions as original
-        if self.loss_type == 'focal':
-            loss, outputs_concat, labels_concat = masif_site_focal_loss(
-                outputs, labels, alpha=self.focal_alpha, gamma=self.focal_gamma
-            )
-        elif self.loss_type == 'weighted':
-            loss, outputs_concat, labels_concat = weighted_masif_site_loss(outputs, labels)
-        else:
-            loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
+        # Use the standard loss function
+        loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
             
         accuracy = compute_accuracy(predictions=outputs_concat, labels=labels_concat, add_sigmoid=True)
         
@@ -93,6 +83,11 @@ class GraphOnlyMasifSiteModule(AtomPLModule):
         loss, logits, labels, accuracy = self.step(batch)
         if loss is None:
             return None
+            
+        # Simple batch monitoring
+        #if batch_idx % 100 == 0:  # Log every 100 batches
+            #pos_ratio = (labels == 1).float().mean()
+            #print(f"Batch {batch_idx}: loss={loss.item():.4f}, pos_ratio={pos_ratio:.3f}, size={len(labels)}")
             
         # Store batch loss for current epoch analysis
         self.instability_tracker.update_batch(loss.item())

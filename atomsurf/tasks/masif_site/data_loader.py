@@ -90,21 +90,7 @@ class MasifSiteDataModule(pl.LightningDataModule):
         dataset = MasifSiteDataset(self.train_sys, self.surface_loader, self.graph_loader, verbose=self.verbose)
         print(f"Training dataset size: {len(self.train_sys)}")
         print(f"Batch size: {self.cfg.loader.batch_size}")
-        
-        # Create the uniform batch sampler
-        #sampler = UniformBatchSampler(
-        #    dataset=dataset,
-        #    batch_size=self.cfg.loader.batch_size,
-        #    num_bins=5,  # You can adjust this based on your dataset size
-        #    shuffle=True,
-        #    drop_last=False
-        #)
-        #sampler = RandomSampler(dataset)
-        
-        # Remove batch_size and shuffle from loader_args since we're using a sampler
-        #loader_args = self.loader_args.copy()
-        #loader_args.pop('batch_size', None)
-        #loader_args.pop('shuffle', None)
+
         return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args)
 
     def val_dataloader(self):
