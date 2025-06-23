@@ -10,9 +10,11 @@ def compute_accuracy(predictions, labels, add_sigmoid=False):
     if add_sigmoid:
         predictions = torch.sigmoid(predictions)
     predicted_labels = torch.round(predictions)
-    # Compare predicted labels with ground truth labels
-    correct_count = (predicted_labels == labels).sum().item()
     total_count = labels.size(0)
+    if total_count == 0:
+        print("[Warning] No labels provided to compute_accuracy. Returning 0.0.")
+        return 0.0
+    correct_count = (predicted_labels == labels).sum().item()
     # Compute accuracy
     accuracy = correct_count / total_count
     return accuracy

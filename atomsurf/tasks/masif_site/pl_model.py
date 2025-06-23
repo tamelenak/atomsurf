@@ -21,6 +21,11 @@ def masif_site_loss(preds, labels):
     pos_labels = torch.ones_like(pos_preds)
     neg_labels = torch.zeros_like(neg_preds)
 
+    # If either class is missing, skip loss computation
+    if len(pos_labels) == 0 or len(neg_labels) == 0:
+        print("[Warning] Only one class present in batch. Skipping loss computation.")
+        return None, None, None
+
     # Subsample majority class to get balanced loss
     n_points_sample = min(len(pos_labels), len(neg_labels))
     pos_indices = torch.randperm(len(pos_labels))[:n_points_sample]
@@ -73,6 +78,9 @@ class MasifSiteModule(AtomPLModule):
         else:
             loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
             
+        if loss is None:
+            return None, None, None, None
+
         accuracy = compute_accuracy(predictions=outputs_concat, labels=labels_concat, add_sigmoid=True)
         # Log batch statistics
         if self.training:
@@ -135,7 +143,13 @@ class MasifSiteModule(AtomPLModule):
 
     def get_metrics(self, logits, labels, prefix):
         logits, labels = torch.cat(logits, dim=0), torch.cat(labels, dim=0)
-        auroc = compute_auroc(predictions=logits, labels=labels)
+        # Check if both classes are present
+        unique_labels = torch.unique(labels)
+        if unique_labels.numel() < 2:
+            print(f"[Warning] Only one class present in validation labels for prefix '{prefix}'. Setting auroc to 0.5.")
+            auroc = 0.5
+        else:
+            auroc = compute_auroc(predictions=logits, labels=labels)
         acc = compute_accuracy(predictions=logits, labels=labels, add_sigmoid=True)
         self.log_dict({
             f"auroc/{prefix}": auroc,

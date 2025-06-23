@@ -35,7 +35,8 @@ Masif Site Task
 - Folders need to be called 01-benchmark_pdbs and 01-benchmark_surfaces OR names have to be changed in the script
 - Set num_workers in masif_site_test.py to number of available CPU workers - 2
 
-Run script
-```bash
-python masif_site_test.py --batch_size 1024 --epochs 10
-```
+Run preproseccing
+python atomsurf/tasks/masif_site/preprocess.py
+
+Run training
+python atomsurf/tasks/masif_site/train_hydra.py run_name=xy comment=xy batch_size=xy

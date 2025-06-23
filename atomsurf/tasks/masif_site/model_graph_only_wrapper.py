@@ -23,20 +23,25 @@ class GraphOnlyMasifSiteWrapper(torch.nn.Module):
         """
         # The encoder will only process graph (surface_encoder=None in gcnonly blocks)
         # but we still need to provide surface for the mapping
-        surface, graph = self.base_model.encoder(graph=batch.graph, surface=batch.surface)
+        surface_out, graph_out = self.base_model.encoder(graph=batch.graph, surface=batch.surface)
         
-        # Graph has been processed with GCN, surface should be unchanged (since surface_encoder=None)
-        # Now we need to map graph features to surface points
-        if surface is not None and graph is not None:
-            # Map graph node features to surface points using nearest neighbors
-            surface_features = self._map_graph_to_surface(
-                graph.x, graph.node_pos, surface.pos, surface.batch, graph.batch
-            )
-            surface.x = surface_features
+        # Map graph features to surface points using nearest neighbors
+        mapped_surface_features = self._map_graph_to_surface(
+            graph_features=graph_out.x,
+            graph_pos=graph_out.node_pos,
+            surface_pos=batch.surface.verts,
+            surface_batch=batch.surface.batch,
+            graph_batch=graph_out.batch
+        )
         
-        # Apply the top network to surface features (mapped from graph)
-        surface.x = self.base_model.top_net(surface.x)
-        return surface
+        # Create a surface batch with mapped features
+        out_surface_batch = batch.surface
+        out_surface_batch.x = mapped_surface_features
+        
+        # Apply top network to get final predictions
+        out_surface_batch.x = self.base_model.top_net(out_surface_batch.x)
+        
+        return out_surface_batch
     
     def _map_graph_to_surface(self, graph_features, graph_pos, surface_pos, surface_batch, graph_batch):
         """

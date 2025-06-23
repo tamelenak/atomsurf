@@ -28,5 +28,5 @@ input_encoder_gvp:
 input_encoder_graph_only:
   _target_: atomsurf.networks.ProteinEncoderBlock
   surface_encoder: None
-  graph_encoder: ${2layer_input_chunk}
-  message_passing: None
+  graph_encoder: ${gcn_block}
+  message_passing: None 

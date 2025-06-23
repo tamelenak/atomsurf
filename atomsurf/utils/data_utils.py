@@ -395,8 +395,15 @@ def update_model_input_dim(cfg, dataset_temp, gkey='graph', skey='surface'):
             if example is not None:
                 with open_dict(cfg):
                     feat_encoder_kwargs = cfg.encoder.blocks[0]
-                    feat_encoder_kwargs.g_pre_block['dim_in'] = example[gkey].x.shape[1]
-                    feat_encoder_kwargs.s_pre_block['dim_in'] = example[skey].x.shape[1]
+                    # For hybrid model with pre-block
+                    if 'g_pre_block' in feat_encoder_kwargs and example.get(gkey) is not None:
+                        feat_encoder_kwargs.g_pre_block['dim_in'] = example[gkey].x.shape[1]
+                    # For graph-only model without pre-block
+                    elif 'graph_encoder' in feat_encoder_kwargs and example.get(gkey) is not None:
+                        feat_encoder_kwargs.graph_encoder['dim_in'] = example[gkey].x.shape[1]
+
+                    if 's_pre_block' in feat_encoder_kwargs and example.get(skey) is not None:
+                        feat_encoder_kwargs.s_pre_block['dim_in'] = example[skey].x.shape[1]
                 found = True
                 break
             if i > 50:

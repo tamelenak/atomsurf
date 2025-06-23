@@ -32,7 +32,7 @@ epochs: 50
 devices: [0]
 strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"
-min_batch_size: 2
+min_batch_size: 1
 use_wandb: False
 verbose: true
 

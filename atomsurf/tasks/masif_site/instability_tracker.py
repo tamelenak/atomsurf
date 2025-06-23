@@ -22,12 +22,9 @@ class InstabilityTracker:
     @staticmethod
     def z_score_instability(losses):
         losses = np.array(losses)
-        deltas = np.abs(np.diff(losses))  # |l_i - l_{i-1}|
+        deltas = np.abs(np.diff(losses))
         mean_delta = np.mean(deltas)
         std_delta = np.std(deltas)
-
-        if std_delta == 0:
-            return 0.0  # perfectly smooth training
 
         z_scores = (deltas - mean_delta) / std_delta
         return np.mean(np.abs(z_scores))
@@ -47,8 +44,6 @@ class InstabilityTracker:
     
     def calculate_final_instability(self):
         """Calculate instability metrics using per-epoch batch data"""
-        if len(self.batches_per_epoch) < 2:
-            return {"error": "Insufficient epochs for analysis"}
             
         # Calculate CV for batches WITHIN each epoch
         epoch_batch_cvs = []

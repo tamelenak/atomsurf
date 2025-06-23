@@ -27,7 +27,7 @@ test_freq = 5
 epochs = 200
 device = 0
 path_model = "version_x/checkpoints/last.ckpt"
-min_batch_size = 2
+min_batch_size = 1
 use_wandb = False
 
 # Loader parameters
