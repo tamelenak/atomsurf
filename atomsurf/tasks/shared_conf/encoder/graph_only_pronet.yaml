@@ -1,0 +1,11 @@
+name: graph_only_pronet
+
+blocks:
+  - _target_: atomsurf.networks.ProteinEncoderBlock
+    surface_encoder: None
+    graph_encoder: ${feature_projector}
+    message_passing: None
+  - ${pronetonly}
+  - ${pronetonly}
+  - ${pronetonly}
+  - ${pronetonly} 

@@ -66,7 +66,7 @@ class GraphOnlyMasifSiteModule(AtomPLModule):
         
         # Use the standard loss function
         loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
-            
+        
         accuracy = compute_accuracy(predictions=outputs_concat, labels=labels_concat, add_sigmoid=True)
         
         # Log batch statistics

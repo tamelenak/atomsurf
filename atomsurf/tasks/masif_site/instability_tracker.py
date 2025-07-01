@@ -116,6 +116,8 @@ class InstabilityTracker:
             log_entry['batch_size'] = getattr(config.loader, 'batch_size', 'unknown')
         if hasattr(config, 'epochs'):
             log_entry['num_epochs'] = getattr(config, 'epochs', 'unknown')
+        if hasattr(config, 'encoder'):
+            log_entry['encoder_name'] = getattr(config.encoder, 'name', 'unknown')
         
         # Save to CSV
         df = pd.DataFrame([log_entry])

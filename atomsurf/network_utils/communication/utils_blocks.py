@@ -5,6 +5,7 @@ from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops
 from atomsurf.network_utils.misc_arch.gvp_gnn import GVPConv
 from torch_scatter import scatter
+import hydra
 
 
 def init_block(name, use_normals=True, use_gat=False, use_v2=False, add_self_loops=False, gvp_use_angles=False,

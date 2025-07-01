@@ -29,4 +29,10 @@ input_encoder_graph_only:
   _target_: atomsurf.networks.ProteinEncoderBlock
   surface_encoder: None
   graph_encoder: ${gcn_block}
+  message_passing: None
+
+input_encoder_graph_only_pronet:
+  _target_: atomsurf.networks.ProteinEncoderBlock
+  surface_encoder: None
+  graph_encoder: ${pronet_block}
   message_passing: None 

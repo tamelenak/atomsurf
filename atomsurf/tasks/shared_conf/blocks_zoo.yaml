@@ -17,6 +17,13 @@ gcn_block:
   use_bn: true
   use_weighted_edge_distance: false
 
+feature_projector:
+  _target_: atomsurf.network_utils.misc_arch.graph_blocks.ProjectorBlock
+  dim_in: ${model_hdim}
+  hidden_dims: ${model_hdim}
+  dim_out: ${model_hdim}
+  dropout: ${model_dropout}
+
 pronet_block:
   _target_: atomsurf.network_utils.ProNet
   level: allatom

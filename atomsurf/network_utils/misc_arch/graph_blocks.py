@@ -31,3 +31,19 @@ class GCNx2Block(torch.nn.Module):
             x = self.bn2(x)
         graph.x = x
         return graph
+
+
+class ProjectorBlock(torch.nn.Module):
+    def __init__(self, dim_in, hidden_dims, dim_out, dropout=0.0):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(dim_in, hidden_dims),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden_dims, dim_out)
+        )
+        self.dropout = torch.nn.Dropout(p=dropout)
+
+    def forward(self, graph):
+        graph.x = self.net(graph.x)
+        graph.x = self.dropout(graph.x)
+        return graph

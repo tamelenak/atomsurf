@@ -27,3 +27,25 @@ class CommandLoggerCallback(Callback):
     def setup(self, trainer, pl_module, stage):
         tensorboard = pl_module.loggers[0].experiment
         tensorboard.add_text("Command", self.command)
+
+
+class ExperimentTrackerCallback(Callback):
+    def __init__(self, encoder_name, log_dir, run_name):
+        import csv
+        import os
+        self.encoder_name = encoder_name
+        self.log_dir = log_dir
+        self.run_name = run_name
+        self.csv = csv
+        self.os = os
+
+    def setup(self, trainer, pl_module, stage):
+        if stage == 'fit':
+            log_path = self.os.path.join(self.log_dir, 'experiment_tracker.csv')
+            file_exists = self.os.path.isfile(log_path)
+            with open(log_path, 'a', newline='') as csvfile:
+                fieldnames = ['run_name', 'encoder_name']
+                writer = self.csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow({'run_name': self.run_name, 'encoder_name': self.encoder_name})
