@@ -82,8 +82,8 @@ cfg_graph:
   data_name: rgraph
   feat_keys: 'all'
   oh_keys: 'all'
-  esm_dir: ../../../data/masif_site/esm
-  use_esm: false
+  esm_dir: ${data_dir}/01-benchmark_esm_embs
+  use_esm: true
 
 
 cfg_head:

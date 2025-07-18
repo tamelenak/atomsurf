@@ -15,9 +15,11 @@ class MasifSiteNet(torch.nn.Module):
             nn.Linear(cfg_head.encoded_dims, cfg_head.encoded_dims),
             nn.Dropout(p=0.1),
             nn.BatchNorm1d(cfg_head.encoded_dims),
-            nn.SiLU(),
+            #nn.SiLU(),
+            nn.LeakyReLU(negative_slope=0.2),
             nn.Linear(cfg_head.encoded_dims, out_features=cfg_head.output_dims),
-            nn.Sigmoid()
+            #nn.Sigmoid()
+            nn.LeakyReLU(negative_slope=0.2)
         ])
 
     def forward(self, batch):
