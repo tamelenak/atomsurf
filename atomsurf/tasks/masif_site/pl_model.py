@@ -11,19 +11,40 @@ from atomsurf.utils.metrics import compute_accuracy, compute_auroc
 from atomsurf.tasks.masif_site.instability_tracker import InstabilityTracker
 
 
-def masif_site_loss(preds, labels):
-    # Inspired from dmasif https://github.com/FreyrS/dMaSIF/blob/master/data_iteration.py#L158
+def masif_site_loss(preds, labels, use_weighted_bce: bool = False):
+    """Compute balanced BCE loss.
 
-    # Get our predictions and corresponding binary labels
+    If *use_weighted_bce* is True the whole batch is used and the minority
+    class is up-weighted via *pos_weight* so no stochastic down-sampling is
+    involved (lower gradient variance).  Otherwise the original random
+    down-sampling strategy is applied for backward compatibility.
+    Returns (loss, preds_used, labels_used) or (None, None, None) if the batch
+    contains only one class.
+    """
+
+    # Handle edge case: single-class batch
+    if (labels == 1).sum() == 0 or (labels == 0).sum() == 0:
+        print("[Warning] Only one class present in batch. Skipping loss computation.")
+        return None, None, None
+
+    if use_weighted_bce:
+        # Compute class weights: pos gets the inverse frequency of pos/neg ratio
+        n_pos = (labels == 1).sum()
+        n_neg = (labels == 0).sum()
+        pos_weight = n_neg.float() / n_pos.float()
+
+        loss = F.binary_cross_entropy_with_logits(
+            preds,
+            labels.float(),
+            pos_weight=pos_weight,
+        )
+        return loss, preds, labels
+
+    # -------- Original stochastic subsampling version --------
     pos_preds = preds[labels == 1]
     neg_preds = preds[labels == 0]
     pos_labels = torch.ones_like(pos_preds)
     neg_labels = torch.zeros_like(neg_preds)
-
-    # If either class is missing, skip loss computation
-    if len(pos_labels) == 0 or len(neg_labels) == 0:
-        print("[Warning] Only one class present in batch. Skipping loss computation.")
-        return None, None, None
 
     # Subsample majority class to get balanced loss
     n_points_sample = min(len(pos_labels), len(neg_labels))
@@ -34,7 +55,6 @@ def masif_site_loss(preds, labels):
     neg_preds = neg_preds[neg_indices]
     neg_labels = neg_labels[neg_indices]
 
-    # Compute loss on these prediction/GT pairs
     preds_concat = torch.cat([pos_preds, neg_preds])
     labels_concat = torch.cat([pos_labels, neg_labels])
     loss = F.binary_cross_entropy_with_logits(preds_concat, labels_concat)
@@ -62,8 +82,10 @@ class MasifSiteModule(AtomPLModule):
         out_surface_batch = self(batch)
         outputs = out_surface_batch.x.flatten()
         
-        # Use the standard loss function
-        loss, outputs_concat, labels_concat = masif_site_loss(outputs, labels)
+        # Use weighted BCE if requested in config
+        loss, outputs_concat, labels_concat = masif_site_loss(
+            outputs, labels, use_weighted_bce=self.hparams.cfg.loss.weighted_bce
+        )
             
         if loss is None:
             return None, None, None, None

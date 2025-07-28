@@ -1,12 +1,14 @@
 # Surface/graph encoders
 diffusion_net:
-  _target_: diffusion_net.DiffusionNetBlock
+  #_target_: diffusion_net.DiffusionNetBlock
+  _target_: atomsurf.network_utils.misc_arch.deep_diffusion.StackedDiffusionNetBlock
   C_width: ${model_hdim}
   dropout: ${model_dropout}
   use_bn: ${eval:'not ${use_layernorm}'}
   use_layernorm: ${use_layernorm}
   init_time: ${diff_time_mean}  # either null (for constant init) or a float
   init_std: ${diff_time_std}
+  num_repeats: 1  # number of DiffusionNetBlocks to stack
 
 gcn_block:
   _target_: atomsurf.network_utils.GCNx2Block
@@ -129,4 +131,10 @@ pronetonly:
   surface_encoder: None
   graph_encoder: ${pronet_block}
   message_passing: None
+
+# Wrapper block that matches `get_middle_block` from atomsurf/utils/wrappers.py
+wrapper_middle:
+  _target_: atomsurf.utils.wrappers.get_middle_block
+  model_dim: ${model_hdim}
+  dropout: ${model_dropout}
 

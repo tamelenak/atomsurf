@@ -89,3 +89,8 @@ cfg_graph:
 cfg_head:
   encoded_dims: ${model_hdim}
   output_dims: 1
+
+# Loss options
+loss:
+  # If true use weighted BCE (no random subsampling); else use original downsampling
+  weighted_bce: false
