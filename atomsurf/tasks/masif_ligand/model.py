@@ -30,8 +30,18 @@ class MasifLigandNet(torch.nn.Module):
         # forward pass
         surface, graph = self.encoder(graph=batch.graph, surface=batch.surface)
 
-        # Now select and average the encoded surface features around each ligand pocket.
-        pos_and_x = [(surf.verts, surf.x) for surf in surface.to_data_list()]
+        # Decide which modality to pool on (default: surface). Allows graph-only comparisons.
+        pool_on = getattr(self.hparams_encoder, 'pool_on', 'surface')
+
+        if pool_on == 'graph':
+            if graph is None:
+                raise ValueError("Graph pooling requested but graph is None. Ensure graph encoder/inputs are enabled.")
+            pos_and_x = [(g.node_pos, g.x) for g in graph.to_data_list()]
+        else:
+            if surface is None:
+                raise ValueError("Surface pooling requested but surface is None. Ensure surface encoder/inputs are enabled.")
+            pos_and_x = [(surf.verts, surf.x) for surf in surface.to_data_list()]
+
         pockets_embs = []
         for (pos, x), lig_coord in zip(pos_and_x, batch.lig_coord):
             selected = self.pool_lig(pos, x, lig_coord)
