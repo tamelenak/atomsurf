@@ -10,6 +10,9 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
+optimizer:
+  lr: 1e-5
+
 hydra:
   job:
     chdir: False
@@ -32,7 +35,7 @@ use_inmem: False
 
 # loader params
 loader:
-  num_workers: 2
+  num_workers: 8
   batch_size: 8
   pin_memory: False
   prefetch_factor: 2
