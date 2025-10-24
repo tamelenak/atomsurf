@@ -55,7 +55,7 @@ class SurfaceLoader:
         if not self.config.use_surfaces:
             return Data()
         try:
-            surface = torch.load(os.path.join(self.data_dir, f"{surface_name}.pt"))
+            surface = torch.load(os.path.join(self.data_dir, f"{surface_name}.pt"), weights_only=False)
             # Early version of the data did not include the normals
             surface.set_vnormals()
             with torch.no_grad():
@@ -399,7 +399,7 @@ def update_model_input_dim(cfg, dataset_temp, gkey='graph', skey='surface'):
                     if 'g_pre_block' in feat_encoder_kwargs and example.get(gkey) is not None:
                         feat_encoder_kwargs.g_pre_block['dim_in'] = example[gkey].x.shape[1]
                     # For graph-only model without pre-block
-                    elif 'graph_encoder' in feat_encoder_kwargs and example.get(gkey) is not None:
+                    elif 'graph_encoder' in feat_encoder_kwargs and feat_encoder_kwargs.graph_encoder is not None and feat_encoder_kwargs.graph_encoder != 'None' and example.get(gkey) is not None:
                         feat_encoder_kwargs.graph_encoder['dim_in'] = example[gkey].x.shape[1]
 
                     if 's_pre_block' in feat_encoder_kwargs and example.get(skey) is not None:

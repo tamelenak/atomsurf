@@ -28,7 +28,7 @@ data_dir: /root/atomsurf/masif_site_data
 out_dir: /root/atomsurf/masif_site_data  # does not work for me with chdir=False
 log_dir: "./"
 test_freq: 5
-epochs: 50
+epochs: 20
 devices: [0]
 strategy: "ddp"
 path_model: "version_x/checkpoints/last.ckpt"

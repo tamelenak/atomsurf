@@ -74,6 +74,9 @@ class MasifSiteModule(AtomPLModule):
         
         # Store config for logging
         self.cfg = cfg
+        
+        # Update experiment info after initialization
+        self.instability_tracker.update_experiment_info(self.cfg.run_name, self.cfg)
 
     def step(self, batch):
         if batch.num_graphs < self.hparams.cfg.min_batch_size:
@@ -123,31 +126,22 @@ class MasifSiteModule(AtomPLModule):
             self.instability_tracker.update_epoch(train_loss.item())
 
     def on_fit_end(self):
-        """Calculate and log final instability metrics when training ends"""
-        # Calculate final instability metrics
-        final_metrics = self.instability_tracker.calculate_final_instability()
+        """Update final AUROC metrics when training ends"""
+        # Get AUROC metrics from the trainer callback metrics
+        train_auroc = self.trainer.callback_metrics.get('auroc/train', None)
+        val_auroc = self.trainer.callback_metrics.get('auroc/val', None)
+        test_auroc = self.trainer.callback_metrics.get('auroc/test', None)
         
-        # Get final performance metrics
-        final_train_loss = self.trainer.callback_metrics.get('loss/train_epoch', None)
-        final_val_loss = self.trainer.callback_metrics.get('loss/val', None)
-        final_test_loss = self.trainer.callback_metrics.get('loss/test', None)
+        # Convert to float if they are tensors
+        train_auroc = train_auroc.item() if train_auroc is not None and hasattr(train_auroc, 'item') else None
+        val_auroc = val_auroc.item() if val_auroc is not None and hasattr(val_auroc, 'item') else None
+        test_auroc = test_auroc.item() if test_auroc is not None and hasattr(test_auroc, 'item') else None
         
-        # Get accuracy metrics from the metrics dictionary
-        final_train_acc = self.trainer.callback_metrics.get('acc/train', None)
-        final_val_acc = self.trainer.callback_metrics.get('acc/val', None)
-        final_test_acc = self.trainer.callback_metrics.get('acc/test', None)
-        
-        # Log final experiment summary
-        self.instability_tracker.log_final_experiment(
-            experiment_name=self.cfg.run_name,
-            config=self.cfg,
-            final_train_loss=final_train_loss.item() if final_train_loss is not None and hasattr(final_train_loss, 'item') else 0,
-            final_val_loss=final_val_loss.item() if final_val_loss is not None and hasattr(final_val_loss, 'item') else None,
-            final_test_loss=final_test_loss.item() if final_test_loss is not None and hasattr(final_test_loss, 'item') else None,
-            final_train_acc=final_train_acc.item() if final_train_acc is not None and hasattr(final_train_acc, 'item') else None,
-            final_val_acc=final_val_acc.item() if final_val_acc is not None and hasattr(final_val_acc, 'item') else None,
-            final_test_acc=final_test_acc.item() if final_test_acc is not None and hasattr(final_test_acc, 'item') else None,
-            comment=self.cfg.comment
+        # Update final metrics in the CSV
+        self.instability_tracker.update_final_metrics(
+            train_auroc=train_auroc,
+            val_auroc=val_auroc,
+            test_auroc=test_auroc
         )
 
     def get_metrics(self, logits, labels, prefix):

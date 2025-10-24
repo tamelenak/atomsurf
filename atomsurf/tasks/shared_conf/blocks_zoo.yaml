@@ -1,14 +1,24 @@
 # Surface/graph encoders
 diffusion_net:
-  #_target_: diffusion_net.DiffusionNetBlock
-  _target_: atomsurf.network_utils.misc_arch.deep_diffusion.StackedDiffusionNetBlock
+  _target_: diffusion_net.DiffusionNetBlock
+  #_target_: atomsurf.network_utils.misc_arch.deep_diffusion.StackedDiffusionNetBlock
   C_width: ${model_hdim}
   dropout: ${model_dropout}
   use_bn: ${eval:'not ${use_layernorm}'}
   use_layernorm: ${use_layernorm}
   init_time: ${diff_time_mean}  # either null (for constant init) or a float
   init_std: ${diff_time_std}
-  num_repeats: 1  # number of DiffusionNetBlocks to stack
+  #num_repeats: 1  # number of DiffusionNetBlocks to stack
+
+# Traditional DiffusionNet (for comparison with DiffusionNet++)
+diffusion_net_traditional:
+  _target_: diffusion_net.DiffusionNetBlockPyGWrapper
+  C_width: ${model_hdim}
+  dropout: ${model_dropout}
+  use_bn: ${eval:'not ${use_layernorm}'}
+  use_layernorm: ${use_layernorm}
+  init_time: ${diff_time_mean}  # either null (for constant init) or a float
+  init_std: ${diff_time_std}
 
 gcn_block:
   _target_: atomsurf.network_utils.GCNx2Block
@@ -108,7 +118,26 @@ dmasif_block:
   dim_out: ${model_hdim}
   argdir: ${dmasif_config}
 
+surface_to_diffusion_projector:
+  _target_: atomsurf.network_utils.misc_arch.graph_blocks.ProjectorBlock
+  dim_in: 52
+  hidden_dims: ${model_hdim}
+  dim_out: ${model_hdim}
+  dropout: ${model_dropout}
+
 diffonly:
+  _target_: atomsurf.networks.ProteinEncoderBlock
+  surface_encoder: ${diffusion_net}
+  graph_encoder: None
+  message_passing: None
+
+diffonly_traditional:
+  _target_: atomsurf.networks.ProteinEncoderBlock
+  surface_encoder: ${diffusion_net_traditional}
+  graph_encoder: None
+  message_passing: None
+
+diffonly_direct:
   _target_: atomsurf.networks.ProteinEncoderBlock
   surface_encoder: ${diffusion_net}
   graph_encoder: None

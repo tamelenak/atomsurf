@@ -4,5 +4,3 @@ name: pronet_hmrencoder
 blocks:
   - ${input_encoder_hmr}
   - ${pronet|gvp}
-  - ${pronet|gvp}
-  - ${pronet|gvp}

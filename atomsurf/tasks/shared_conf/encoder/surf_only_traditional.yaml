@@ -1,0 +1,9 @@
+name: surf_only_traditional
+
+
+blocks:
+  - ${input_encoder_gvp}
+  - ${diffonly_traditional}
+#  - ${diffonly_traditional}
+#  - ${diffonly_traditional}
+

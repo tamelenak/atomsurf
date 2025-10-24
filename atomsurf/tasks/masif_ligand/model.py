@@ -14,7 +14,7 @@ class MasifLigandNet(torch.nn.Module):
         self.top_net = nn.Sequential(*[
             nn.Linear(cfg_head.encoded_dims, cfg_head.encoded_dims),
             nn.Dropout(p=0.1),
-            nn.BatchNorm1d(cfg_head.encoded_dims),
+            #nn.BatchNorm1d(cfg_head.encoded_dims),
             nn.SiLU(),
             nn.Linear(cfg_head.encoded_dims, out_features=cfg_head.output_dims)
         ])

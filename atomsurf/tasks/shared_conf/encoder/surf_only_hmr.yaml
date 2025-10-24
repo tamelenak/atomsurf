@@ -2,7 +2,7 @@ name: surf_only
 
 
 blocks:
-  - ${input_encoder_gvp}
+  - ${input_encoder_hmr}
   - ${diffonly}
 #  - ${diffonly}
 #  - ${diffonly}

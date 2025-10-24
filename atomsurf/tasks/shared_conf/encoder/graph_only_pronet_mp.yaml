@@ -1,0 +1,5 @@
+name: graph_only_pronet_mp
+
+blocks:
+  - ${input_encoder_gvp}
+  - ${pronetonly}
