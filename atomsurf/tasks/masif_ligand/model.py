@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch_geometric.nn.norm import GraphNorm
 
 from atomsurf.networks.protein_encoder import ProteinEncoder
 
@@ -11,10 +12,21 @@ class MasifLigandNet(torch.nn.Module):
         self.hparams_encoder = cfg_encoder
         self.encoder = ProteinEncoder(cfg_encoder)
 
+        norm_type = getattr(cfg_head, 'norm_type', 'batch').lower()
+        
+        if norm_type == 'layer':
+            norm_layer = nn.LayerNorm(cfg_head.encoded_dims)
+        elif norm_type == 'batch':
+            norm_layer = nn.BatchNorm1d(cfg_head.encoded_dims)
+        elif norm_type == 'graph':
+            norm_layer = GraphNorm(cfg_head.encoded_dims)
+        else:
+            raise ValueError(f"norm_type {norm_type} not supported")
+
         self.top_net = nn.Sequential(*[
             nn.Linear(cfg_head.encoded_dims, cfg_head.encoded_dims),
             nn.Dropout(p=0.1),
-            #nn.BatchNorm1d(cfg_head.encoded_dims),
+            norm_layer,
             nn.SiLU(),
             nn.Linear(cfg_head.encoded_dims, out_features=cfg_head.output_dims)
         ])

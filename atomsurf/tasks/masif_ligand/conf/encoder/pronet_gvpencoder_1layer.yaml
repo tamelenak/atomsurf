@@ -1,4 +1,4 @@
-name: pronet_gvpencoder
+name: pronet_gvpencoder_1layer
 
 blocks:
   - ${input_encoder_gvp}

@@ -1,0 +1,9 @@
+name: surf_only_5layers
+
+blocks:
+  - ${input_encoder_gvp}
+  - ${diffonly}
+  - ${diffonly}
+  - ${diffonly}
+  - ${diffonly}
+  - ${diffonly}

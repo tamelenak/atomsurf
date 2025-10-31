@@ -32,6 +32,7 @@ log_dir: "./"
 path_model: "version_x/checkpoints/last.ckpt"
 min_batch_size: 2
 use_inmem: False
+exclude_failed_patches: False
 
 # loader params
 loader:
@@ -40,6 +41,7 @@ loader:
   pin_memory: False
   prefetch_factor: 2
   shuffle: true
+  drop_last: false  # Set to true to drop last incomplete batch
 
 train:
   save_top_k: 2
@@ -86,6 +88,7 @@ cfg_graph:
 cfg_head:
   encoded_dims: ${model_hdim}
   output_dims: 7
+  norm_type: batch  # Options: batch, layer, graph
 
 # encoder-specific switches
 encoder:

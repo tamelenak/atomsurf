@@ -1,0 +1,7 @@
+name: surf_only_3layers
+
+blocks:
+  - ${input_encoder_gvp}
+  - ${diffonly}
+  - ${diffonly}
+  - ${diffonly}

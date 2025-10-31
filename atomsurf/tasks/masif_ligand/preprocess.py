@@ -71,10 +71,12 @@ class PreProcessPDBDataset(PreprocessDataset):
             script_dir = os.path.dirname(os.path.realpath(__file__))
             data_dir = os.path.join(script_dir, '..', '..', '..', 'data', 'masif_ligand')
 
+        # Pass the correct PDB directory to the parent class
+        pdb_dir = os.path.join(data_dir, 'raw_data_MasifLigand', 'pdb')
+        
         super().__init__(data_dir=data_dir, recompute_s=recompute_s, recompute_g=recompute_g,
-                         max_vert_number=max_vert_number, face_reduction_rate=face_reduction_rate)
-        # Compared to super(), we redefine the original PDB location
-        self.pdb_dir = os.path.join(data_dir, 'raw_data_MasifLigand', 'pdb')
+                         max_vert_number=max_vert_number, face_reduction_rate=face_reduction_rate,
+                         pdb_dir=pdb_dir)
 
         self.compute_s = compute_s
         if self.compute_s:
@@ -90,7 +92,6 @@ class PreProcessPDBDataset(PreprocessDataset):
                 os.rmdir(out_surf_dir)
             except (FileNotFoundError, OSError):
                 pass
-        self.all_pdbs = self.get_all_pdbs()
 
     def __getitem__(self, idx):
         pdb = self.all_pdbs[idx]

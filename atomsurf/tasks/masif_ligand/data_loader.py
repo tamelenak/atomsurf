@@ -18,10 +18,13 @@ ligands = ["ADP", "COA", "FAD", "HEM", "NAD", "NAP", "SAM"]
 type_idx = {type_: ix for ix, type_ in enumerate(ligands)}
 
 
-def get_systems_from_ligands(split_list_path, ligands_path, out_path=None, recompute=False):
+def get_systems_from_ligands(split_list_path, ligands_path, out_path=None, recompute=False, exclude_patches=None):
     if out_path is not None:
         if os.path.exists(out_path) and not recompute:
             all_pockets = pickle.load(open(out_path, "rb"))
+            # Apply exclusion filter if provided
+            if exclude_patches:
+                all_pockets = {k: v for k, v in all_pockets.items() if k not in exclude_patches}
             return all_pockets
     all_pockets = {}
     split_list = open(split_list_path).read().splitlines()
@@ -35,6 +38,9 @@ def get_systems_from_ligands(split_list_path, ligands_path, out_path=None, recom
         for ix, (lig_type, lig_coord) in enumerate(zip(ligand_types, ligand_coords)):
             lig_coord = lig_coord.astype(np.float32)
             pocket = f'{pdb_chains}_patch_{ix}_{lig_type}'
+            # Skip if in exclusion list
+            if exclude_patches and pocket in exclude_patches:
+                continue
             all_pockets[pocket] = np.reshape(lig_coord, (-1, 3)), type_idx[lig_type]
     if out_path is not None:
         pickle.dump(all_pockets, open(out_path, "wb"))
@@ -79,10 +85,14 @@ class MasifLigandDataset(Dataset):
         surface = self.surface_builder.load(pocket)
         graph = self.graph_builder.load(pocket)
         if surface is None or graph is None:
+            # Log which file failed
+            import sys
+            print(f"[LOAD_FAILED] {pocket}: surface={'OK' if surface is not None else 'MISSING'}, graph={'OK' if graph is not None else 'MISSING'}", file=sys.stderr, flush=True)
             return None
         if torch.isnan(surface.x).any() or torch.isnan(graph.x).any():
+            print(f"[LOAD_FAILED] {pocket}: NaN detected in {'surface' if torch.isnan(surface.x).any() else 'graph'}", file=sys.stderr, flush=True)
             return None
-        item = Data(surface=surface, graph=graph, lig_coord=lig_coord, label=lig_type)
+        item = Data(surface=surface, graph=graph, lig_coord=lig_coord, label=lig_type, pocket_name=pocket)
         return item
 
 
@@ -110,6 +120,22 @@ class MasifLigandDataModule(pl.LightningDataModule):
             masif_ligand_data_dir = cfg.data_dir
         splits_dir = os.path.join(masif_ligand_data_dir, 'raw_data_MasifLigand', 'splits')
         ligands_path = os.path.join(masif_ligand_data_dir, 'raw_data_MasifLigand', 'ligand')
+        
+        # Load exclusion lists if exclude_failed_patches is True
+        exclude_failed_patches = getattr(cfg, 'exclude_failed_patches', True)
+        self.exclude_patches = {}
+        if exclude_failed_patches:
+            for split in ['train', 'val', 'test']:
+                exclude_file = os.path.join(splits_dir, f'{split}_exclude_patches.txt')
+                if os.path.exists(exclude_file):
+                    with open(exclude_file, 'r') as f:
+                        self.exclude_patches[split] = set(line.strip() for line in f if line.strip())
+                else:
+                    self.exclude_patches[split] = set()
+        else:
+            for split in ['train', 'val', 'test']:
+                self.exclude_patches[split] = set()
+        
         self.use_inmem = cfg.use_inmem
         if self.use_inmem:
             self.train_dir = os.path.join(cfg.data_dir, 'Inmemory_train_surfhmr_rggraph_esm.pt')
@@ -120,15 +146,18 @@ class MasifLigandDataModule(pl.LightningDataModule):
         self.systems = []
         for split in ['train', 'val', 'test']:
             splits_path = os.path.join(splits_dir, f'{split}-list.txt')
-            out_path = os.path.join(splits_dir, f'{split}.p')
+            out_path = os.path.join(splits_dir, f'{split}_filtered.p' if exclude_failed_patches else f'{split}_full.p')
             self.systems.append(get_systems_from_ligands(splits_path,
                                                          ligands_path=ligands_path,
-                                                         out_path=out_path))
+                                                         out_path=out_path,
+                                                         exclude_patches=self.exclude_patches[split]))
         self.cfg = cfg
+        drop_last = getattr(self.cfg.loader, 'drop_last', False)
         self.loader_args = {'num_workers': self.cfg.loader.num_workers,
                             'batch_size': self.cfg.loader.batch_size,
                             'pin_memory': self.cfg.loader.pin_memory,
                             'prefetch_factor': self.cfg.loader.prefetch_factor,
+                            'drop_last': drop_last,
                             'collate_fn': lambda x: AtomBatch.from_data_list(x)}
 
         if self.use_inmem:

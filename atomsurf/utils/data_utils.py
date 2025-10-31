@@ -40,7 +40,7 @@ class SurfaceLoader:
         self.config = config
         self.data_dir = os.path.join(config.data_dir, config.data_name)
         self.feature_expander = None
-        if "gdf_expand" in config and config.gdf_expand:
+        if hasattr(config, 'gdf_expand') and config.gdf_expand:
             self.gauss_curv_gdf = GaussianDistance(start=-0.1, stop=0.1, num_centers=16)
             self.mean_curv_gdf = GaussianDistance(start=-0.5, stop=0.5, num_centers=16)
             self.feature_expander = {'geom_feats': self.gdf_expand}
@@ -253,8 +253,8 @@ class PreprocessDataset(Dataset):
     """
 
     def __init__(self, data_dir, recompute_s=False, recompute_g=False, do_agraph=False,
-                 max_vert_number=100000, face_reduction_rate=0.1, use_pymesh=None, pdb_dirname='01-benchmark_pdbs'):
-        self.pdb_dir = os.path.join(data_dir, pdb_dirname)
+                 max_vert_number=100000, face_reduction_rate=0.1, use_pymesh=None, pdb_dir=None):
+        self.pdb_dir = pdb_dir if pdb_dir is not None else os.path.join(data_dir, 'pdb')
 
         # Surf params
         self.max_vert_number = max_vert_number

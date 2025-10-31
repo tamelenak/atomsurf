@@ -1,0 +1,9 @@
+name: pronet_gvpencoder_5layers
+
+blocks:
+  - ${input_encoder_gvp}
+  - ${pronet|gvp}
+  - ${pronet|gvp}
+  - ${pronet|gvp}
+  - ${pronet|gvp}
+  - ${pronet|gvp}
