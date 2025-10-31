@@ -1,3 +1,7 @@
+# Data
+masif_site_data/
+analysis/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -165,6 +169,7 @@ cython_debug/
 # Ignore all wandb folders in any subfolder
 **/wandb/
 **/lightning_logs/
+**/lightning_logs_archive/
 
 bin/
 # ignore all files in data/
