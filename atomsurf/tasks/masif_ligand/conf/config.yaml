@@ -42,6 +42,7 @@ loader:
   prefetch_factor: 2
   shuffle: true
   drop_last: false  # Set to true to drop last incomplete batch
+  max_drop_per_batch: 0  # Maximum number of samples to randomly drop per batch (0 = disabled)
 
 train:
   save_top_k: 2

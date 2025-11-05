@@ -1,5 +1,6 @@
 import os
 import sys
+import random
 
 import numpy as np
 import pickle
@@ -16,6 +17,34 @@ from atomsurf.utils.data_utils import SurfaceLoader, GraphLoader, AtomBatch, upd
 
 ligands = ["ADP", "COA", "FAD", "HEM", "NAD", "NAP", "SAM"]
 type_idx = {type_: ix for ix, type_ in enumerate(ligands)}
+
+
+def create_collate_fn(max_drop_per_batch, min_batch_size):
+    """
+    Create a collate function that randomly drops samples to simulate batch size variation.
+    
+    Args:
+        max_drop_per_batch: Maximum number of samples to randomly drop (0 = disabled)
+        min_batch_size: Minimum batch size to ensure after dropping
+    
+    Returns:
+        Collate function that filters None values and optionally drops random samples
+    """
+    def collate_fn(data_list):
+        data_list = [x for x in data_list if x is not None]
+
+        if max_drop_per_batch == 0 or len(data_list) == 0:
+            return AtomBatch.from_data_list(data_list)
+        
+        num_to_drop = random.randint(0, max_drop_per_batch)
+        
+        if num_to_drop > 0:
+            indices_to_keep = random.sample(range(len(data_list)), len(data_list) - num_to_drop)
+            data_list = [data_list[i] for i in indices_to_keep]
+        
+        return AtomBatch.from_data_list(data_list)
+    
+    return collate_fn
 
 
 def get_systems_from_ligands(split_list_path, ligands_path, out_path=None, recompute=False, exclude_patches=None):
@@ -153,12 +182,16 @@ class MasifLigandDataModule(pl.LightningDataModule):
                                                          exclude_patches=self.exclude_patches[split]))
         self.cfg = cfg
         drop_last = getattr(self.cfg.loader, 'drop_last', False)
+        max_drop_per_batch = getattr(self.cfg.loader, 'max_drop_per_batch', 0)
+        min_batch_size = getattr(self.cfg, 'min_batch_size', 1)
         self.loader_args = {'num_workers': self.cfg.loader.num_workers,
                             'batch_size': self.cfg.loader.batch_size,
                             'pin_memory': self.cfg.loader.pin_memory,
                             'prefetch_factor': self.cfg.loader.prefetch_factor,
-                            'drop_last': drop_last,
-                            'collate_fn': lambda x: AtomBatch.from_data_list(x)}
+                            'drop_last': drop_last}
+        
+        # Store collate function for training (with batch variation) separately
+        self.train_collate_fn = create_collate_fn(max_drop_per_batch, min_batch_size)
 
         if self.use_inmem:
             dataset_temp = MasifLigandDataset_InMemory(self.val_dir)
@@ -188,21 +221,24 @@ class MasifLigandDataModule(pl.LightningDataModule):
             dataset = MasifLigandDataset_InMemory(self.train_dir)
         else:
             dataset = MasifLigandDataset(self.systems[0], self.surface_loader, self.graph_loader)
-        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, **self.loader_args)
+        return DataLoader(dataset, shuffle=self.cfg.loader.shuffle, 
+                         collate_fn=self.train_collate_fn, **self.loader_args)
 
     def val_dataloader(self):
         if self.use_inmem:
             dataset = MasifLigandDataset_InMemory(self.val_dir)
         else:
             dataset = MasifLigandDataset(self.systems[1], self.surface_loader, self.graph_loader)
-        return DataLoader(dataset, shuffle=False, **self.loader_args)
+        return DataLoader(dataset, shuffle=False, 
+                         collate_fn=lambda x: AtomBatch.from_data_list(x), **self.loader_args)
 
     def test_dataloader(self):
         if self.use_inmem:
             dataset = MasifLigandDataset_InMemory(self.test_dir)
         else:
             dataset = MasifLigandDataset(self.systems[2], self.surface_loader, self.graph_loader)
-        return DataLoader(dataset, shuffle=False, **self.loader_args)
+        return DataLoader(dataset, shuffle=False, 
+                         collate_fn=lambda x: AtomBatch.from_data_list(x), **self.loader_args)
 
 
 if __name__ == '__main__':
